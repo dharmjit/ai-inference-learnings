@@ -361,15 +361,18 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
 <header class="topbar">
   <a class="brand" href="#top">Keys<em>,</em> Queues <em>&amp;</em> Caches</a>
   <nav class="parts" aria-label="Parts">
-    <a href="#s01" data-part="1">The request path</a>
-    <a href="#s04" data-part="2">The key is the perimeter</a>
-    <a href="#s07" data-part="3">Sharing a GPU</a>
-    <a href="#s10" data-part="4">Capacity</a>
-    <a href="#s13" data-part="5">A region, sized</a>
+    <a href="#s01" data-part="1">Overview</a>
+    <a href="#s04" data-part="2">Gateway</a>
+    <a href="#s06" data-part="3">Key service</a>
+    <a href="#s09" data-part="4">Limit service</a>
+    <a href="#s10" data-part="5">Router</a>
+    <a href="#s11" data-part="6">Engine</a>
+    <a href="#s14" data-part="7">Autoscaler</a>
+    <a href="#s16" data-part="8">Fleet arbiter</a>
   </nav>
   <nav class="utils">
     <a href="#s00" data-part="0">Origins</a>
-    <a href="#glossary" data-part="6">Glossary</a>
+    <a href="#glossary" data-part="9">Glossary</a>
     <a href="#" id="showAll">Show all</a>
   </nav>
 </header>
@@ -381,34 +384,46 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
         <a href="#s00"><span>—</span>Origins</a>
     </div>
     <div class="rail-g" data-part="1" hidden>
-      <div class="rail-h">I · The request path</div>
+      <div class="rail-h">The whole stack</div>
         <a href="#s01"><span>01</span>The shape of it</a>
-        <a href="#s02"><span>02</span>The gateway holds on</a>
-        <a href="#s03"><span>03</span>The latency budget</a>
+        <a href="#s02"><span>02</span>The latency budget</a>
+        <a href="#s03"><span>03</span>A region, sized</a>
     </div>
     <div class="rail-g" data-part="2" hidden>
-      <div class="rail-h">II · The key is the perimeter</div>
-        <a href="#s04"><span>04</span>Anatomy of a key</a>
-        <a href="#s05"><span>05</span>Verifying every request</a>
-        <a href="#s06"><span>06</span>When a key leaks</a>
+      <div class="rail-h">Gateway</div>
+        <a href="#s04"><span>04</span>The gateway holds on</a>
+        <a href="#s05"><span>05</span>Inside the gateway</a>
     </div>
     <div class="rail-g" data-part="3" hidden>
-      <div class="rail-h">III · Sharing a GPU fairly</div>
-        <a href="#s07"><span>07</span>Inside one replica</a>
-        <a href="#s08"><span>08</span>Three layers of isolation</a>
-        <a href="#s09"><span>09</span>Choosing a replica</a>
+      <div class="rail-h">Key service</div>
+        <a href="#s06"><span>06</span>Anatomy of a key</a>
+        <a href="#s07"><span>07</span>Verifying every request</a>
+        <a href="#s08"><span>08</span>When a key leaks</a>
     </div>
     <div class="rail-g" data-part="4" hidden>
-      <div class="rail-h">IV · Capacity that follows demand</div>
-        <a href="#s10"><span>10</span>What to scale on</a>
-        <a href="#s11"><span>11</span>Cold start</a>
-        <a href="#s12"><span>12</span>Ten models, one fleet</a>
+      <div class="rail-h">Limit service</div>
+        <a href="#s09"><span>09</span>One limit, many gateways</a>
     </div>
     <div class="rail-g" data-part="5" hidden>
-      <div class="rail-h">V · A region, end to end</div>
-        <a href="#s13"><span>13</span>A region, sized</a>
+      <div class="rail-h">Router</div>
+        <a href="#s10"><span>10</span>Choosing a replica</a>
     </div>
     <div class="rail-g" data-part="6" hidden>
+      <div class="rail-h">Engine</div>
+        <a href="#s11"><span>11</span>Inside one replica</a>
+        <a href="#s12"><span>12</span>Three layers of isolation</a>
+        <a href="#s13"><span>13</span>The fair-queue scheduler</a>
+    </div>
+    <div class="rail-g" data-part="7" hidden>
+      <div class="rail-h">Autoscaler</div>
+        <a href="#s14"><span>14</span>What to scale on</a>
+        <a href="#s15"><span>15</span>Cold start</a>
+    </div>
+    <div class="rail-g" data-part="8" hidden>
+      <div class="rail-h">Fleet arbiter</div>
+        <a href="#s16"><span>16</span>Ten models, one fleet</a>
+    </div>
+    <div class="rail-g" data-part="9" hidden>
       <div class="rail-h">Reference</div>
         <a href="#coda"><span>—</span>Coda · bound it, spend it locally</a>
         <a href="#glossary"><span>—</span>Glossary</a>
@@ -423,72 +438,90 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
   <h1>Keys, queues<br>and caches</h1>
   <p class="lede">Anyone holding about seventy characters can ask a fleet of GPUs to think for them, on replicas shared with everyone else. This guide designs that service — regional, multi-tenant, ten models, autoscaled — starting from the request path and working inward.</p>
   <div class="key">
-    <span><i style="background:var(--edge)"></i> the request path</span>
+    <span><i style="background:var(--edge)"></i> gateway · router · limits</span>
     <span><i style="background:var(--trust)"></i> keys · trust</span>
-    <span><i style="background:var(--gpu)"></i> the GPU · the engine</span>
-    <span><i style="background:var(--ctl)"></i> control loops · capacity</span>
+    <span><i style="background:var(--gpu)"></i> engine · GPU</span>
+    <span><i style="background:var(--ctl)"></i> autoscaler · arbiter</span>
   </div>
 
   <div class="paths">
     <div class="path">
       <b>You’re building the API</b>
-      <span>The path a request takes, the key that opens it, and what keeps it fast.</span>
-      <div class="hops"><a href="#s01">01</a> <a href="#s02">02</a> <a href="#s03">03</a> <a href="#s04">04</a></div>
+      <span>The path a request takes, the process that carries it, and the key that opens it.</span>
+      <div class="hops"><a href="#s01">01</a> <a href="#s04">04</a> <a href="#s05">05</a> <a href="#s06">06</a></div>
     </div>
     <div class="path">
       <b>You run the GPUs</b>
-      <span>What a replica actually runs out of, and how capacity follows demand.</span>
-      <div class="hops"><a href="#s07">07</a> <a href="#s08">08</a> <a href="#s10">10</a> <a href="#s11">11</a></div>
+      <span>What a replica runs out of, who gets it next, and how capacity follows demand.</span>
+      <div class="hops"><a href="#s11">11</a> <a href="#s13">13</a> <a href="#s14">14</a> <a href="#s15">15</a></div>
     </div>
     <div class="path">
       <b>You own the platform</b>
       <span>How the fleet is kept safe, shared fairly, and sized.</span>
-      <div class="hops"><a href="#s06">06</a> <a href="#s08">08</a> <a href="#s12">12</a> <a href="#s13">13</a></div>
+      <div class="hops"><a href="#s03">03</a> <a href="#s08">08</a> <a href="#s09">09</a> <a href="#s16">16</a></div>
     </div>
     <div class="path">
       <b>The whole thing</b>
-      <span>Open Origins and follow Next. Each part assumes the one before it.</span>
+      <span>Open Origins and follow Next — one component at a time, in the order a request meets them.</span>
       <div class="hops"><a href="#s00">00</a></div>
     </div>
   </div>
 
   <nav class="toc">
     <div>
-      <div class="toc-h">I · The request path</div>
+      <div class="toc-h">The whole stack</div>
       <ul>
         <li><span class="no">01</span><a href="#s01">The shape of it</a></li>
-        <li><span class="no">02</span><a href="#s02">The gateway holds on</a></li>
-        <li><span class="no">03</span><a href="#s03">The latency budget</a></li>
+        <li><span class="no">02</span><a href="#s02">The latency budget</a></li>
+        <li><span class="no">03</span><a href="#s03">A region, sized</a></li>
       </ul>
     </div>
     <div>
-      <div class="toc-h">II · The key is the perimeter</div>
+      <div class="toc-h">Gateway</div>
       <ul>
-        <li><span class="no">04</span><a href="#s04">Anatomy of a key</a></li>
-        <li><span class="no">05</span><a href="#s05">Verifying every request</a></li>
-        <li><span class="no">06</span><a href="#s06">When a key leaks</a></li>
+        <li><span class="no">04</span><a href="#s04">The gateway holds on</a></li>
+        <li><span class="no">05</span><a href="#s05">Inside the gateway</a></li>
       </ul>
     </div>
     <div>
-      <div class="toc-h">III · Sharing a GPU fairly</div>
+      <div class="toc-h">Key service</div>
       <ul>
-        <li><span class="no">07</span><a href="#s07">Inside one replica</a></li>
-        <li><span class="no">08</span><a href="#s08">Three layers of isolation</a></li>
-        <li><span class="no">09</span><a href="#s09">Choosing a replica</a></li>
+        <li><span class="no">06</span><a href="#s06">Anatomy of a key</a></li>
+        <li><span class="no">07</span><a href="#s07">Verifying every request</a></li>
+        <li><span class="no">08</span><a href="#s08">When a key leaks</a></li>
       </ul>
     </div>
     <div>
-      <div class="toc-h">IV · Capacity that follows demand</div>
+      <div class="toc-h">Limit service</div>
       <ul>
-        <li><span class="no">10</span><a href="#s10">What to scale on</a></li>
-        <li><span class="no">11</span><a href="#s11">Cold start</a></li>
-        <li><span class="no">12</span><a href="#s12">Ten models, one fleet</a></li>
+        <li><span class="no">09</span><a href="#s09">One limit, many gateways</a></li>
       </ul>
     </div>
     <div>
-      <div class="toc-h">V · A region, end to end</div>
+      <div class="toc-h">Router</div>
       <ul>
-        <li><span class="no">13</span><a href="#s13">A region, sized</a></li>
+        <li><span class="no">10</span><a href="#s10">Choosing a replica</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">Engine</div>
+      <ul>
+        <li><span class="no">11</span><a href="#s11">Inside one replica</a></li>
+        <li><span class="no">12</span><a href="#s12">Three layers of isolation</a></li>
+        <li><span class="no">13</span><a href="#s13">The fair-queue scheduler</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">Autoscaler</div>
+      <ul>
+        <li><span class="no">14</span><a href="#s14">What to scale on</a></li>
+        <li><span class="no">15</span><a href="#s15">Cold start</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">Fleet arbiter</div>
+      <ul>
+        <li><span class="no">16</span><a href="#s16">Ten models, one fleet</a></li>
       </ul>
     </div>
   </nav>
@@ -511,7 +544,7 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
     <div class="hrow"><span class="yr">2018</span><span class="what" style="color:var(--gpu)">TensorRT Inference Server → Triton<span class="who">NVIDIA</span></span><span class="why">Dynamic batching: hold requests for a few milliseconds and run them together. It batches <em>requests</em>, which works for a classifier and badly for a stream whose length nobody knows.</span></div>
     <div class="hrow"><span class="yr">2018</span><span class="what" style="color:var(--trust)">Token scanning<span class="who">GitHub</span></span><span class="why">Providers register the shape of their secrets; GitHub reports matches pushed to public repositories. The single most useful thing a key format can do is be recognisable.</span></div>
     <div class="hrow"><span class="yr">2020</span><span class="what" style="color:var(--edge)">The GPT-3 API<span class="who">OpenAI</span></span><span class="why">A model behind a bearer key, priced per token. Every inference API since has inherited the shape — including the fact that the key is the whole perimeter.</span></div>
-    <div class="hrow"><span class="yr">2021</span><span class="what" style="color:var(--trust)">Prefixed, checksummed tokens<span class="who">GitHub · <code>ghp_…</code></span></span><span class="why">A prefix that names the issuer and a checksum that lets anyone reject a typo offline. Section 04 copies both.</span></div>
+    <div class="hrow"><span class="yr">2021</span><span class="what" style="color:var(--trust)">Prefixed, checksummed tokens<span class="who">GitHub · <code>ghp_…</code></span></span><span class="why">A prefix that names the issuer and a checksum that lets anyone reject a typo offline. Section 06 copies both.</span></div>
     <div class="hrow"><span class="yr">2022</span><span class="what" style="color:var(--gpu)">Orca<span class="who">Yu et al., Seoul National University · OSDI ’22</span></span><span class="why">Schedule per <em>iteration</em>, not per request: a sequence joins the batch when it arrives and leaves when it finishes. Continuous batching is now the default everywhere.</span></div>
     <div class="hrow"><span class="yr">2022</span><span class="what" style="color:var(--gpu)">FlashAttention<span class="who">Tri Dao et al., Stanford</span></span><span class="why">Attention rewritten around memory traffic rather than arithmetic. The first loud signal that inference is bandwidth-bound.</span></div>
     <div class="hrow"><span class="yr">2023</span><span class="what" style="color:var(--edge)">Chat Completions over SSE<span class="who">OpenAI</span></span><span class="why"><code>POST /v1/chat/completions</code> with <code>stream: true</code> became the de facto wire protocol — which is why this guide assumes it rather than designing one.</span></div>
@@ -523,7 +556,7 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
     <div class="hrow"><span class="yr">2025</span><span class="what" style="color:var(--ctl)">Inference Gateway · llm-d · Dynamo<span class="who">Kubernetes SIG Network · Red Hat, Google, IBM et al. · NVIDIA</span></span><span class="why">Routing that reads the engine’s queue and cache instead of counting connections. Load balancing finally learned what it was balancing.</span></div>
   </div>
 
-  <div class="note"><b>The pattern worth noticing:</b> nearly all of the invention is below the API — batching, paging, caching, routing. Above it, the design is a 2020 web API that nobody revisited: a bearer key and an HTTP endpoint. Shared, public, multi-tenant service is exactly where that inheritance stops being enough, and it is where this guide spends Parts II and III.</div>
+  <div class="note"><b>The pattern worth noticing:</b> nearly all of the invention is below the API — batching, paging, caching, routing. Above it, the design is a 2020 web API that nobody revisited: a bearer key and an HTTP endpoint. Shared, public, multi-tenant service is exactly where that inheritance stops being enough, and it is where this guide spends the gateway, key service and engine.</div>
       <nav class="seq">
         <a class="seq-next" href="#s01"><span>Next</span>01 — The shape of it</a>
       </nav>
@@ -532,9 +565,9 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
 </section>
 
 <div class="part" data-part="1">
-  <div class="part-n">Part I</div>
-  <div class="part-t">The request path</div>
-  <p class="part-d">One POST, followed from the public internet to the first token and back. Every promise the service makes — speed, fairness, safety — is either enforced on this path or not at all.</p>
+  <div class="part-n">Overview</div>
+  <div class="part-t">The whole stack</div>
+  <p class="part-d">Seven components between the public internet and a GPU: how a request passes through them, what the path is allowed to cost, and what the whole thing looks like at a real number.</p>
 </div>
 
 <section id="s01">
@@ -638,27 +671,42 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
       <text class="s-t" x="284" y="498">key service</text>
       <text class="s-ts" x="284" y="514">records · revoke bus</text>
     </svg>
-    <figcaption>Solid arrows are the request, dashed are the stream coming back and the <b>background</b> traffic that keeps the gateway’s local state fresh: key-cache fills and revocations from the key service, and each gateway’s <b>share</b> of every tenant’s limits from the limit service. The hop to a replica carries token IDs and a <b>signed context</b>, never the customer’s key (<a href="#s06">06</a>).</figcaption>
+    <figcaption>Solid arrows are the request, dashed are the stream coming back and the <b>background</b> traffic that keeps the gateway’s local state fresh: key-cache fills and revocations from the key service, and each gateway’s <b>share</b> of every tenant’s limits from the limit service. The hop to a replica carries token IDs and a <b>signed context</b>, never the customer’s key (<a href="#s08">08</a>).</figcaption>
   </figure>
 
   <div class="walk">
     <div><b>0</b><span>A per-IP limiter runs <em>before</em> authentication, so the auth path itself can’t be used to exhaust the gateway.</span></div>
     <div><b>1</b><span>The key’s prefix and checksum are checked offline. Random strings are rejected without touching a cache or a database.</span></div>
-    <div><b>2</b><span>The key is looked up in the gateway’s own memory and its HMAC compared. The key service is off the path (<a href="#s05">05</a>).</span></div>
+    <div><b>2</b><span>The key is looked up in the gateway’s own memory and its HMAC compared. The key service is off the path (<a href="#s07">07</a>).</span></div>
     <div><b>3</b><span>The model must be in the key’s allowlist; <code>max_tokens</code> and prompt length are clamped to the catalog entry.</span></div>
     <div><b>4</b><span>The gateway applies the model’s chat template and tokenizes. From here on the service knows the <em>exact</em> input token count.</span></div>
-    <div><b>5</b><span>Request, token and concurrency limits for this tenant and model, from buckets already in the gateway’s memory (<a href="#s08">08</a>).</span></div>
-    <div><b>6</b><span>A replica is picked from live engine metrics, preferring one that already has this tenant’s prefix cached (<a href="#s09">09</a>).</span></div>
+    <div><b>5</b><span>Request, token and concurrency limits for this tenant and model, from buckets already in the gateway’s memory (<a href="#s09">09</a>).</span></div>
+    <div><b>6</b><span>A replica is picked from live engine metrics, preferring one that already has this tenant’s prefix cached (<a href="#s10">10</a>).</span></div>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Component</th><th>What it is</th><th>On the request path?</th><th>State</th><th>Sections</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">gateway</td><td>Stateless L7 proxy; runs stages 0–6 and stays on the stream</td><td><span class="pill edgep">yes · every byte</span></td><td>five in-memory tables, all rebuildable</td><td class="num"><a href="#s04">04</a> <a href="#s05">05</a></td></tr>
+        <tr><td class="nm">key service</td><td>Issues, stores and revokes keys; pushes changes</td><td>only on a cache miss</td><td>keys table in Postgres</td><td class="num"><a href="#s06">06</a> <a href="#s07">07</a> <a href="#s08">08</a></td></tr>
+        <tr><td class="nm">limit service</td><td>Splits each tenant’s limits into per-gateway shares</td><td>no · once a second</td><td>soft; rebuilt from reports</td><td class="num"><a href="#s09">09</a></td></tr>
+        <tr><td class="nm">router</td><td>Replica picker — a library inside the gateway, not a hop</td><td><span class="pill edgep">yes · in-process</span></td><td>the gateway’s replica table</td><td class="num"><a href="#s10">10</a></td></tr>
+        <tr><td class="nm">engine</td><td>vLLM replica plus the admission queue beside it</td><td><span class="pill gpup">yes · the work itself</span></td><td>KV cache, per-tenant counters</td><td class="num"><a href="#s11">11</a> <a href="#s12">12</a> <a href="#s13">13</a></td></tr>
+        <tr><td class="nm">autoscaler</td><td>One control loop per model pool</td><td>no · every 15 s</td><td>policy per pool</td><td class="num"><a href="#s14">14</a> <a href="#s15">15</a></td></tr>
+        <tr><td class="nm">fleet arbiter</td><td>Assigns GPU nodes between pools</td><td>no · on scale events</td><td>node assignments, pool min/max</td><td class="num"><a href="#s16">16</a></td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="tablewrap">
     <table>
       <thead><tr><th>The promise</th><th>Where it is enforced</th><th>Mechanism</th><th>Section</th></tr></thead>
       <tbody>
-        <tr><td class="nm">Fast under load</td><td>gateway budget · router · engine</td><td>≤ 5 ms added before the engine; load- and cache-aware routing; continuous batching with chunked prefill</td><td class="num"><a href="#s03">03</a> <a href="#s07">07</a> <a href="#s09">09</a></td></tr>
-        <tr><td class="nm">Autoscales</td><td>per-pool controller</td><td>scale on queue wait and KV use, not CPU; warm pools because cold start is minutes</td><td class="num"><a href="#s10">10</a> <a href="#s11">11</a> <a href="#s12">12</a></td></tr>
-        <tr><td class="nm">No noisy neighbours</td><td>gateway <em>and</em> engine</td><td>token-denominated limits at the edge; fair queue and per-tenant KV caps inside the batch</td><td class="num"><a href="#s08">08</a></td></tr>
-        <tr><td class="nm">The key is the perimeter</td><td>gateway stages 0–2 · the network</td><td>offline-checkable format, HMAC at rest, pushed revocation; replicas accept only the gateway</td><td class="num"><a href="#s04">04</a> <a href="#s05">05</a> <a href="#s06">06</a></td></tr>
+        <tr><td class="nm">Fast under load</td><td>gateway budget · router · engine</td><td>≤ 5 ms added before the engine; load- and cache-aware routing; continuous batching with chunked prefill</td><td class="num"><a href="#s02">02</a> <a href="#s11">11</a> <a href="#s10">10</a></td></tr>
+        <tr><td class="nm">Autoscales</td><td>per-pool controller</td><td>scale on queue wait and KV use, not CPU; warm pools because cold start is minutes</td><td class="num"><a href="#s14">14</a> <a href="#s15">15</a> <a href="#s16">16</a></td></tr>
+        <tr><td class="nm">No noisy neighbours</td><td>gateway <em>and</em> engine</td><td>token-denominated limits at the edge; fair queue and per-tenant KV caps inside the batch</td><td class="num"><a href="#s09">09</a> <a href="#s12">12</a> <a href="#s13">13</a></td></tr>
+        <tr><td class="nm">The key is the perimeter</td><td>gateway stages 0–2 · the network</td><td>offline-checkable format, HMAC at rest, pushed revocation; replicas accept only the gateway</td><td class="num"><a href="#s06">06</a> <a href="#s07">07</a> <a href="#s08">08</a></td></tr>
       </tbody>
     </table>
   </div>
@@ -666,7 +714,7 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
   <div class="note trust"><b>The one rule everything else depends on:</b> replicas have no public ingress. They accept mTLS only from workload identities belonging to the gateway, and a network policy denies everything else. Every protection in this guide lives in the gateway, so a single path around it would make all of them decorative.</div>
       <nav class="seq">
         <a class="seq-prev" href="#s00"><span>Previous</span>Origins</a>
-        <a class="seq-next" href="#s02"><span>Next</span>02 — The gateway holds on</a>
+        <a class="seq-next" href="#s02"><span>Next</span>02 — The latency budget</a>
       </nav>
     </div>
   </details>
@@ -675,86 +723,7 @@ footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-fa
 <section id="s02">
   <details open>
     <summary>
-      <div class="eyebrow">02 — The gateway holds on</div>
-      <h2>The gateway stays for the whole conversation</h2>
-      <p class="q">Why doesn’t the gateway hand the request to a replica and step aside?</p>
-    </summary>
-    <div class="sec-body">
-      <p class="lede">A web gateway’s work is done once the response starts. Here the response is the expensive part — it can run for minutes, and every token of it is GPU time shared with everyone else.</p>
-
-  <div class="duo">
-    <div class="card inkc2">
-      <div class="tag" style="color:var(--ink-soft)">Step aside · L4 pass-through</div>
-      <h3>Cheap, and blind</h3>
-      <ul>
-        <li>Gateway authenticates, then splices the client straight to a replica.</li>
-        <li>Fewer bytes through the gateway; <b>no per-token work</b>.</li>
-        <li>Cannot stop a stream part-way — for a revoked key, an output limit, or a drain — without teaching the replica about tenants.</li>
-        <li>Client disconnects become the replica’s problem, observed late or not at all.</li>
-      </ul>
-    </div>
-    <div class="card edgec">
-      <div class="tag" style="color:var(--edge)">Stay on the path · L7 proxy</div>
-      <h3>Expensive, and in control</h3>
-      <ul>
-        <li>Gateway proxies every SSE event from the replica to the client.</li>
-        <li><b>Counts tokens as they pass</b>, enforces output-token limits, and can end the stream cleanly.</li>
-        <li>Sees the client go away the moment it happens, and <b>aborts the engine request</b>.</li>
-        <li>Replicas know nothing about keys or tenants beyond a signed context.</li>
-      </ul>
-    </div>
-  </div>
-
-  <p class="body">This is the choice that makes mid-stream enforcement possible at all — revocation, output limits, clean shutdown — and it keeps the engine a pure compute service. The cost is that the gateway holds long-lived connections. It stops being sized by requests per second and starts being sized by <em>concurrent streams</em> — which Little’s law gives directly: 1,500 new streams a second that last 12 seconds on average is 18,000 open at once (<a href="#s13">13</a>).</p>
-
-  <div class="sub">
-    <h3>What goes over the wire</h3>
-    <p>Server-sent events: a long HTTP response of <code>data:</code> lines, each a JSON delta. The service adds two things the minimal protocol leaves out — a comment line every 15 seconds so idle proxies don’t cut a slow stream, and a <em>typed error event</em> for the case where the stream has to stop early.</p>
-  </div>
-  <pre class="code"><span class="c"># a normal stream</span>
-data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{"content":"The"}}]}
-
-data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{"content":" answer"}}]}
-
-<span class="h">: keepalive</span>
-
-data: {"id":"chatcmpl-7f3a","choices":[],"usage":{"prompt_tokens":812,"completion_tokens":214}}
-
-data: [DONE]
-
-<span class="c"># the same stream, when its key is revoked part-way (05)</span>
-data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{},"finish_reason":"key_revoked"}]}
-
-data: {"error":{"type":"key_revoked","message":"the API key for this request was revoked"}}
-
-data: [DONE]</pre>
-
-  <div class="sub">
-    <h3>A disconnect is an abort</h3>
-    <p>When the client closes the connection — or an HTTP/2 client resets the stream — the gateway cancels its upstream request, and the engine frees that sequence’s KV blocks on its next step. Without this, a user who presses stop and retries twice costs three full generations, and the replica spends its memory on answers nobody will read.</p>
-  </div>
-
-  <div class="sub">
-    <h3>Tokenize once, at the edge</h3>
-    <p>The gateway applies the model’s chat template and tokenizes, then sends <em>token IDs</em> to the engine rather than text. The engine skips its own tokenization, and the gateway knows the exact input token count before admission — which token-denominated limits depend on (<a href="#s08">08</a>). The tokenizer and template are versioned with the model: they ship in the same catalog release as the weights, and the gateway refuses to route to a replica whose model revision doesn’t match its own.</p>
-  </div>
-
-  <div class="sub">
-    <h3>Deploying a gateway without cutting streams</h3>
-    <p>A gateway pod being replaced stops accepting new connections, then keeps its existing streams until they finish or reach the service’s maximum stream duration — ten minutes here, enforced for exactly this reason. Anything still open at the deadline gets a <code>server_shutdown</code> error event rather than a reset, so clients can retry with a clear conscience. The drain window sets how fast a gateway rollout can go; it is typically the slowest part of shipping the edge.</p>
-  </div>
-      <nav class="seq">
-        <a class="seq-prev" href="#s01"><span>Previous</span>01 — The shape of it</a>
-        <a class="seq-next" href="#s03"><span>Next</span>03 — The latency budget</a>
-      </nav>
-    </div>
-  </details>
-</section>
-
-<section id="s03">
-  <details open>
-    <summary>
-      <div class="eyebrow">03 — The latency budget</div>
+      <div class="eyebrow">02 — The latency budget</div>
       <h2>Five milliseconds, spent in advance</h2>
       <p class="q">How much can the service add before the GPU even starts?</p>
     </summary>
@@ -795,7 +764,7 @@ data: [DONE]</pre>
       <text class="s-ts s-tm" x="700" y="212">300 ms</text>
       <text class="s-ts s-tm" x="920" y="212">400 ms</text>
     </svg>
-    <figcaption>The <b>blue sliver</b> is the whole gateway. Illustrative numbers for a 2,000-token prompt on a 70B model. As utilisation rises the gateway’s share doesn’t move — <b>queue wait</b> does, and it grows without limit as the pool approaches saturation. That is the autoscaler’s job (<a href="#s10">10</a>), not the gateway’s.</figcaption>
+    <figcaption>The <b>blue sliver</b> is the whole gateway. Illustrative numbers for a 2,000-token prompt on a 70B model. As utilisation rises the gateway’s share doesn’t move — <b>queue wait</b> does, and it grows without limit as the pool approaches saturation. That is the autoscaler’s job (<a href="#s14">14</a>), not the gateway’s.</figcaption>
   </figure>
 
   <div class="tablewrap">
@@ -831,28 +800,361 @@ data: [DONE]</pre>
       <ul>
         <li>No database read to check a key; no call to the limit service per request.</li>
         <li>No synchronous access log — logs are buffered and shipped.</li>
-        <li>Limit shares are rebalanced in the background, once a second (<a href="#s08">08</a>).</li>
+        <li>Limit shares are rebalanced in the background, once a second (<a href="#s09">09</a>).</li>
       </ul>
     </div>
   </div>
       <nav class="seq">
-        <a class="seq-prev" href="#s02"><span>Previous</span>02 — The gateway holds on</a>
-        <a class="seq-next" href="#s04"><span>Next</span>04 — Anatomy of a key</a>
+        <a class="seq-prev" href="#s01"><span>Previous</span>01 — The shape of it</a>
+        <a class="seq-next" href="#s03"><span>Next</span>03 — A region, sized</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s03">
+  <details open>
+    <summary>
+      <div class="eyebrow">03 — A region, sized</div>
+      <h2>Fifteen hundred requests a second, costed</h2>
+      <p class="q">What does the whole thing look like at a real number?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A single region across three availability zones, at a peak of 1,500 new requests a second, with an average prompt of 1,500 tokens, an average answer of 350, and an average stream lasting 12 seconds.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model class</th><th>Share</th><th>Req/s</th><th>Output tok/s</th><th>Per replica*</th><th>Replicas</th><th>GPUs</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">8B · 7B</td><td class="num">35%</td><td class="num">525</td><td class="num">184k</td><td class="num">8,000 · 1 GPU</td><td class="num">23</td><td class="num">23 H100</td></tr>
+        <tr><td class="nm">24B · 27B · 32B</td><td class="num">20%</td><td class="num">300</td><td class="num">105k</td><td class="num">4,000 · 1 GPU</td><td class="num">27</td><td class="num">27 H100</td></tr>
+        <tr><td class="nm">70B class · 3 models</td><td class="num">30%</td><td class="num">450</td><td class="num">158k</td><td class="num">3,500 · TP=2</td><td class="num">45</td><td class="num">90 H100</td></tr>
+        <tr><td class="nm">Mixtral 8×22B</td><td class="num">5%</td><td class="num">75</td><td class="num">26k</td><td class="num">4,000 · TP=4</td><td class="num">7</td><td class="num">28 H100</td></tr>
+        <tr><td class="nm">DeepSeek-V3</td><td class="num">10%</td><td class="num">150</td><td class="num">53k</td><td class="num">6,000 · TP=8</td><td class="num">9</td><td class="num">72 H200</td></tr>
+      </tbody>
+      <tfoot><tr><td class="nm">at peak</td><td class="num">100%</td><td class="num">1,500</td><td class="num">525k</td><td></td><td class="num">111</td><td class="num">168 H100 · 72 H200</td></tr></tfoot>
+    </table>
+  </div>
+  <p class="body">* Output tokens per second per replica at this prompt/answer mix while meeting the latency SLO — <em>an assumption to be replaced by your own benchmark</em>, not a vendor number. With 25% headroom for losing a zone and for scale-up lag, the fleet at peak is about <em>27 H100 nodes and 12 H200 nodes</em>; off-peak the autoscaler hands most of that back to the arbiter, down to the floor in <a href="#s16">16</a>.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Component</th><th>Size at peak</th><th>Load it carries</th><th>Scales on</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">gateway</td><td>12 pods × 4 vCPU, 4 per zone</td><td>18,000 concurrent streams (1,500 × 12 s); ≤ 2,500 each, so a zone can be lost</td><td>concurrent streams</td></tr>
+        <tr><td class="nm">key service</td><td>3 pods + Postgres</td><td>cache misses only — tens per second; revocations are rare</td><td>—</td></tr>
+        <tr><td class="nm">revocation bus</td><td>3 nodes</td><td>fan-out to 12 subscribers</td><td>—</td></tr>
+        <tr><td class="nm">limit service</td><td>3 nodes, 1 per zone</td><td>share rebalancing: roughly active tenants × gateways per second</td><td>active tenants</td></tr>
+        <tr><td class="nm">engines</td><td>111 replicas, 240 GPUs</td><td>2.25M input + 525k output tokens/s</td><td>queue wait · KV use</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><b>What the sizes say.</b> Everything except the engines is small — a few dozen CPU pods and one small database guarding roughly 240 GPUs. That ratio is the argument for the design’s shape: spend CPU freely at the edge to keep a GPU from doing a single token of work it shouldn’t, whether that token is unauthorised, abandoned, or crowding out another tenant.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s02"><span>Previous</span>02 — The latency budget</a>
+        <a class="seq-next" href="#s04"><span>Next</span>04 — The gateway holds on</a>
       </nav>
     </div>
   </details>
 </section>
 
 <div class="part" data-part="2">
-  <div class="part-n">Part II</div>
-  <div class="part-t">The key is the perimeter</div>
-  <p class="part-d">A bearer string is the only thing between the public internet and a fleet that costs thousands of dollars an hour. It has to be cheap to check a million times a second, useless if stolen from our database, recognisable if leaked, and dead within a second of being revoked.</p>
+  <div class="part-n">Component 1 of 7</div>
+  <div class="part-t">Gateway</div>
+  <p class="part-d">Stateless, on the connection for the whole stream, and the only door. Every per-request decision in the service is made here, from memory.</p>
 </div>
 
 <section id="s04">
   <details open>
     <summary>
-      <div class="eyebrow">04 — Anatomy of a key</div>
+      <div class="eyebrow">04 — The gateway holds on</div>
+      <h2>The gateway stays for the whole conversation</h2>
+      <p class="q">Why doesn’t the gateway hand the request to a replica and step aside?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A web gateway’s work is done once the response starts. Here the response is the expensive part — it can run for minutes, and every token of it is GPU time shared with everyone else.</p>
+
+  <div class="duo">
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Step aside · L4 pass-through</div>
+      <h3>Cheap, and blind</h3>
+      <ul>
+        <li>Gateway authenticates, then splices the client straight to a replica.</li>
+        <li>Fewer bytes through the gateway; <b>no per-token work</b>.</li>
+        <li>Cannot stop a stream part-way — for a revoked key, an output limit, or a drain — without teaching the replica about tenants.</li>
+        <li>Client disconnects become the replica’s problem, observed late or not at all.</li>
+      </ul>
+    </div>
+    <div class="card edgec">
+      <div class="tag" style="color:var(--edge)">Stay on the path · L7 proxy</div>
+      <h3>Expensive, and in control</h3>
+      <ul>
+        <li>Gateway proxies every SSE event from the replica to the client.</li>
+        <li><b>Counts tokens as they pass</b>, enforces output-token limits, and can end the stream cleanly.</li>
+        <li>Sees the client go away the moment it happens, and <b>aborts the engine request</b>.</li>
+        <li>Replicas know nothing about keys or tenants beyond a signed context.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="body">This is the choice that makes mid-stream enforcement possible at all — revocation, output limits, clean shutdown — and it keeps the engine a pure compute service. The cost is that the gateway holds long-lived connections. It stops being sized by requests per second and starts being sized by <em>concurrent streams</em> — which Little’s law gives directly: 1,500 new streams a second that last 12 seconds on average is 18,000 open at once (<a href="#s03">03</a>).</p>
+
+  <div class="sub">
+    <h3>What goes over the wire</h3>
+    <p>Server-sent events: a long HTTP response of <code>data:</code> lines, each a JSON delta. The service adds two things the minimal protocol leaves out — a comment line every 15 seconds so idle proxies don’t cut a slow stream, and a <em>typed error event</em> for the case where the stream has to stop early.</p>
+  </div>
+  <pre class="code"><span class="c"># a normal stream</span>
+data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{"content":"The"}}]}
+
+data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{"content":" answer"}}]}
+
+<span class="h">: keepalive</span>
+
+data: {"id":"chatcmpl-7f3a","choices":[],"usage":{"prompt_tokens":812,"completion_tokens":214}}
+
+data: [DONE]
+
+<span class="c"># the same stream, when its key is revoked part-way (07)</span>
+data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{},"finish_reason":"key_revoked"}]}
+
+data: {"error":{"type":"key_revoked","message":"the API key for this request was revoked"}}
+
+data: [DONE]</pre>
+
+  <div class="sub">
+    <h3>A disconnect is an abort</h3>
+    <p>When the client closes the connection — or an HTTP/2 client resets the stream — the gateway cancels its upstream request, and the engine frees that sequence’s KV blocks on its next step. Without this, a user who presses stop and retries twice costs three full generations, and the replica spends its memory on answers nobody will read.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Tokenize once, at the edge</h3>
+    <p>The gateway applies the model’s chat template and tokenizes, then sends <em>token IDs</em> to the engine rather than text. The engine skips its own tokenization, and the gateway knows the exact input token count before admission — which token-denominated limits depend on (<a href="#s09">09</a>). The tokenizer and template are versioned with the model: they ship in the same catalog release as the weights, and the gateway refuses to route to a replica whose model revision doesn’t match its own.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Deploying a gateway without cutting streams</h3>
+    <p>A gateway pod being replaced stops accepting new connections, then keeps its existing streams until they finish or reach the service’s maximum stream duration — ten minutes here, enforced for exactly this reason. Anything still open at the deadline gets a <code>server_shutdown</code> error event rather than a reset, so clients can retry with a clear conscience. The drain window sets how fast a gateway rollout can go; it is typically the slowest part of shipping the edge.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s03"><span>Previous</span>03 — A region, sized</a>
+        <a class="seq-next" href="#s05"><span>Next</span>05 — Inside the gateway</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s05">
+  <details open>
+    <summary>
+      <div class="eyebrow">05 — Inside the gateway</div>
+      <h2>One process, five tables, nothing waits on the network</h2>
+      <p class="q">What is the gateway actually made of?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Every per-request decision in the service is made here, and each one reads a table that something else keeps fresh in the background. The gateway is a small program wrapped around five in-memory tables and one loop per stream.</p>
+
+  <div class="duo">
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Envoy + external processing</div>
+      <h3>Mature edge, awkward state</h3>
+      <ul>
+        <li>TLS, HTTP/2 and connection handling are battle-tested.</li>
+        <li>Per-chunk logic means either an <code>ext_proc</code> gRPC round-trip for every SSE event, or a custom filter in C++, Wasm or a Rust module.</li>
+        <li>Cross-request state — buckets, the stream index, the key cache — has to live outside the proxy or be rebuilt inside a filter.</li>
+      </ul>
+    </div>
+    <div class="card edgec">
+      <div class="tag" style="color:var(--edge)">Purpose-built · recommended</div>
+      <h3>Small program, all state local</h3>
+      <ul>
+        <li>Go on the standard <code>net/http</code> and HTTP/2 stack, or Rust on <code>hyper</code>. A few thousand lines.</li>
+        <li>Every table is a structure in the same process; the per-chunk path is a function call.</li>
+        <li>The cost is owning edge hardening — kept small by leaving the L4 LB in front and using the language’s stock HTTP stack, not a custom one.</li>
+      </ul>
+    </div>
+  </div>
+
+  <figure class="wide">
+    <svg viewBox="0 0 1000 380" role="img" aria-label="Inside the gateway: a hot path of listener, pipeline, upstream and proxy loop reads five in-memory tables; each table is kept fresh by a background loop fed from another component.">
+      <text class="s-ts" x="20" y="26">hot path · per request, per chunk</text>
+      <g class="edge">
+        <rect class="s-card" x="20" y="40" width="170" height="60" rx="10"/>
+        <rect class="s-card" x="220" y="40" width="190" height="60" rx="10"/>
+        <rect class="s-card" x="440" y="40" width="170" height="60" rx="10"/>
+        <rect class="s-card" x="640" y="40" width="190" height="60" rx="10"/>
+        <line class="s-flow" x1="190" y1="70" x2="217" y2="70" marker-end="url(#ah-edge)"/>
+        <line class="s-flow" x1="410" y1="70" x2="437" y2="70" marker-end="url(#ah-edge)"/>
+        <line class="s-flow" x1="610" y1="70" x2="637" y2="70" marker-end="url(#ah-edge)"/>
+        <line class="s-dash" x1="830" y1="70" x2="877" y2="70" marker-end="url(#ah-edge)"/>
+      </g>
+      <text class="s-t s-tm" x="105" y="66">listener</text>
+      <text class="s-ts s-tm" x="105" y="84">TLS · HTTP/1.1, h2</text>
+      <text class="s-t s-tm" x="315" y="66">pipeline</text>
+      <text class="s-ts s-tm" x="315" y="84">stages 0–6 · 01</text>
+      <text class="s-t s-tm" x="525" y="66">upstream</text>
+      <text class="s-ts s-tm" x="525" y="84">h2 pool per replica</text>
+      <text class="s-t s-tm" x="735" y="66">proxy loop</text>
+      <text class="s-ts s-tm" x="735" y="84">one per stream</text>
+      <rect class="s-box" x="880" y="40" width="100" height="60" rx="10"/>
+      <text class="s-t s-tm" x="930" y="66">client</text>
+      <text class="s-ts s-tm" x="930" y="84">SSE</text>
+
+      <line x1="110" y1="140" x2="880" y2="140" stroke="var(--ink-soft)" stroke-width="1.5" opacity=".6"/>
+      <g class="inkc">
+        <line class="s-link" x1="315" y1="140" x2="315" y2="103" marker-end="url(#ah)"/>
+        <line class="s-link" x1="735" y1="140" x2="735" y2="103" marker-end="url(#ah)"/>
+        <line class="s-link" x1="110" y1="140" x2="110" y2="170"/>
+        <line class="s-link" x1="302" y1="140" x2="302" y2="170"/>
+        <line class="s-link" x1="494" y1="140" x2="494" y2="170"/>
+        <line class="s-link" x1="686" y1="140" x2="686" y2="170"/>
+        <line class="s-link" x1="878" y1="140" x2="878" y2="170"/>
+      </g>
+      <text class="s-ts" x="330" y="130">lock-free reads · atomic pointer swaps on update</text>
+
+      <rect class="s-zone" x="20" y="170" width="180" height="62" rx="10"/>
+      <rect class="s-zone" x="212" y="170" width="180" height="62" rx="10"/>
+      <rect class="s-zone" x="404" y="170" width="180" height="62" rx="10"/>
+      <rect class="s-zone" x="596" y="170" width="180" height="62" rx="10"/>
+      <rect class="s-zone" x="788" y="170" width="180" height="62" rx="10"/>
+      <text class="s-t s-tm" x="110" y="197" style="fill:var(--trust)">key cache</text>
+      <text class="s-ts s-tm" x="110" y="215">+ negative cache</text>
+      <text class="s-t s-tm" x="302" y="197">bucket table</text>
+      <text class="s-ts s-tm" x="302" y="215">tenant × model × dim</text>
+      <text class="s-t s-tm" x="494" y="197">catalog snapshot</text>
+      <text class="s-ts s-tm" x="494" y="215">immutable, versioned</text>
+      <text class="s-t s-tm" x="686" y="197" style="fill:var(--gpu)">replica table</text>
+      <text class="s-ts s-tm" x="686" y="215">per pool · 100 ms old</text>
+      <text class="s-t s-tm" x="878" y="197">stream index</text>
+      <text class="s-ts s-tm" x="878" y="215">key → open streams</text>
+
+      <text class="s-ts" x="122" y="262">background loops</text>
+      <g class="trust"><rect class="s-card" x="20" y="290" width="180" height="50" rx="10"/><line class="s-dash" x1="110" y1="290" x2="110" y2="235" marker-end="url(#ah-trust)"/></g>
+      <g class="edge"><rect class="s-card" x="212" y="290" width="180" height="50" rx="10"/><line class="s-dash" x1="302" y1="290" x2="302" y2="235" marker-end="url(#ah-edge)"/></g>
+      <g class="ctl"><rect class="s-card" x="404" y="290" width="180" height="50" rx="10"/><line class="s-dash" x1="494" y1="290" x2="494" y2="235" marker-end="url(#ah-ctl)"/></g>
+      <g class="gpu"><rect class="s-card" x="596" y="290" width="180" height="50" rx="10"/><line class="s-dash" x1="686" y1="290" x2="686" y2="235" marker-end="url(#ah-gpu)"/></g>
+      <g class="trust"><rect class="s-card" x="788" y="290" width="180" height="50" rx="10"/><line class="s-dash" x1="878" y1="290" x2="878" y2="235" marker-end="url(#ah-trust)"/></g>
+      <text class="s-t s-tm" x="110" y="312">key service</text>
+      <text class="s-ts s-tm" x="110" y="328">fills · revocations</text>
+      <text class="s-t s-tm" x="302" y="312">limit service</text>
+      <text class="s-ts s-tm" x="302" y="328">shares every 1 s</text>
+      <text class="s-t s-tm" x="494" y="312">catalog release</text>
+      <text class="s-ts s-tm" x="494" y="328">signed bundle</text>
+      <text class="s-t s-tm" x="686" y="312">engine metrics</text>
+      <text class="s-ts s-tm" x="686" y="328">pushed every 100 ms</text>
+      <text class="s-t s-tm" x="878" y="312">revocation bus</text>
+      <text class="s-ts s-tm" x="878" y="328">ends open streams</text>
+    </svg>
+    <figcaption>The <b>hot path</b> only reads. Every write to a table comes from a <b>background loop</b>, applied by building a new version and swapping a pointer, so a request never waits on a lock held by an update. The stream index is the one table the hot path writes — once when a stream opens, once when it closes.</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Table</th><th>Shape</th><th>Size · per pod</th><th>Written by</th><th>Stale behaviour</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">key cache</td><td>sharded map <code>key_id → KeyRecord</code>, LRU-bounded; plus <code>key_id → expiry</code> for known-bad IDs</td><td class="num">≤ 500k keys · ~150 MB</td><td>fetch on miss; revocation events</td><td>TTL 60 s, then refetch; key service down → keep serving cached keys</td></tr>
+        <tr><td class="nm">bucket table</td><td><code>(tenant, model, dim) → {level, rate, burst, share_ver}</code>, updated with atomics</td><td class="num">active tenants × 4 dims</td><td>limit service, every second</td><td>no update for 10 s → fall back to a static split (<a href="#s09">09</a>)</td></tr>
+        <tr><td class="nm">catalog snapshot</td><td>immutable struct: model → revision, tokenizer, template, clamps, pool, default limits</td><td class="num">10 models · tokenizers ~100 MB</td><td>catalog release</td><td>keeps the last good version; never partially applied</td></tr>
+        <tr><td class="nm">replica table</td><td>pool → replicas <code>{addr, zone, revision, queue, running, kv_used, healthy, inflight_from_me}</code></td><td class="num">~120 replicas</td><td>engine metrics push; <code>inflight_from_me</code> by the hot path</td><td>no push for 1 s → replica marked unhealthy for new requests</td></tr>
+        <tr><td class="nm">stream index</td><td><code>key_id → set(stream)</code> and <code>(tenant, model) → open count</code></td><td class="num">≤ 2,500 streams</td><td>hot path, on open and close</td><td>authoritative for this pod — nothing to go stale</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub">
+    <h3>One stream, start to finish</h3>
+    <p>A stream is one handler and one loop. The request context is cancelled the moment the client goes away, and every exit path ends in the same place: cancel the upstream so the engine frees the sequence, release the stream slot.</p>
+  </div>
+  <pre class="code"><span class="c">// one goroutine per request · everything it reads is already in memory</span>
+func (g *Gateway) serve(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()                                  <span class="c">// cancelled on client disconnect</span>
+    req, err := g.pipeline.run(r)                       <span class="c">// stages 0–6: limits, key, tokenize, admit, pick</span>
+    if err != nil { writeError(w, err); return }        <span class="c">// 401 · 404 · 413 · 429 with Retry-After</span>
+
+    s := g.streams.open(req)                            <span class="c">// stream index + concurrency slot</span>
+    defer g.streams.close(s)
+
+    up, err := g.upstream.start(ctx, req)               <span class="c">// h2 stream to a replica; ≤ 1 retry before first byte</span>
+    if err != nil { writeError(w, err); return }
+    defer up.cancel()                                   <span class="c">// engine aborts; KV blocks freed on its next step</span>
+
+    for ev := range up.events(g.cfg.stallTimeout) {     <span class="c">// parsed SSE from the engine</span>
+        if s.revoked.Load() { writeEvent(w, errKeyRevoked); return }
+        g.buckets.debit(req.tenant, req.model, OUT, ev.newTokens)   <span class="c">// may go into debt: blocks new admissions, not this stream</span>
+        if err := writeEvent(w, ev); err != nil { return }         <span class="c">// client gone or too slow</span>
+    }
+}</pre>
+  <p class="body">The engine is asked for continuous usage in its stream (vLLM’s <code>continuous_usage_stats</code>), so each event carries an exact token count and the gateway never re-tokenizes output. Output-token limits are debited as tokens pass but never cut a running stream: a bucket in debt refuses the tenant’s <em>next</em> request instead, which is the difference between a limit and a truncated answer.</p>
+
+  <div class="sub">
+    <h3>Backpressure, at both ends</h3>
+    <p>A stream has a producer the gateway doesn’t control and a consumer it doesn’t trust. Each way either can misbehave has a detector and an action.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Condition</th><th>Detected by</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">slow client</td><td>write buffer over 256 KB, or a write blocked for 30 s</td><td>end with <code>slow_consumer</code>; abort the engine — its tokens are otherwise generated for nobody</td></tr>
+        <tr><td class="nm">no first token</td><td>per-pool deadline above p99.9 queue wait, e.g. 60 s</td><td>nothing sent yet → retry once on another replica; else <code>upstream_timeout</code></td></tr>
+        <tr><td class="nm">stall mid-stream</td><td>no event for 30 s on an unfinished sequence</td><td>error event, abort, mark the replica suspect in the replica table</td></tr>
+        <tr><td class="nm">replica refuses</td><td>503 from a replica that is full or draining</td><td>retry once elsewhere — only before the first byte to the client</td></tr>
+        <tr><td class="nm">gateway full</td><td>open streams ≥ 2,500 on this pod</td><td><code>503</code> with <code>Retry-After: 1</code>; readiness reports saturated so the LB shifts new connections</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><b>Retries are rationed.</b> A gateway retries only before the first byte, never on a 4xx, at most once per request, and within a budget of 10% of a pool’s requests over any 10 s. Without the budget, a pool that is slow because it is overloaded gets a retry storm exactly when it can least absorb one.</div>
+
+  <div class="sub">
+    <h3>The catalog is configuration, released like code</h3>
+    <p>Everything the gateway knows about a model comes from one versioned entry. The tokenizer and chat template are part of the model’s revision, released with its weights, because a gateway that tokenizes with one version and a replica that expects another produce wrong answers with no error.</p>
+  </div>
+  <pre class="code"><span class="c"># one catalog entry · shipped as a signed bundle, applied atomically</span>
+model:            llama-3.3-70b
+revision:         r7                             <span class="c"># weights + tokenizer + template, released together</span>
+tokenizer_sha256: 3b1f…
+chat_template:    llama3.jinja
+max_context:      131072
+max_output:       8192                           <span class="c"># max_tokens is clamped to this</span>
+pool:             llama70-h100-tp2
+default_limits:   { rpm: 600, input_tpm: 2M, output_tpm: 400k, streams: 64 }
+rollout:          { r6: 10%, r7: 90% }           <span class="c"># both revisions serve during a release</span></pre>
+  <p class="body">A new bundle is verified, its tokenizers loaded and hash-checked, and only then swapped in. During a rollout the gateway picks a revision per request, tokenizes with that revision, and routes only to replicas advertising it — so the two halves of the fleet never see each other’s tokens.</p>
+
+  <div class="sub">
+    <h3>What it reports, and what pages someone</h3>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Metric</th><th>Why</th><th>Pages when</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">stage_seconds{stage}</td><td>Holds the 5 ms budget to account (<a href="#s02">02</a>)</td><td>p99 of the pipeline over 5 ms for 10 min</td></tr>
+        <tr><td class="nm">ttft_seconds{pool} · itl_seconds{pool}</td><td>What users feel, measured where they feel it</td><td>SLO burn rate over 2× for 1 h, or over 10× for 5 min</td></tr>
+        <tr><td class="nm">auth_fail_total{reason}</td><td>Checksum vs unknown vs revoked separates sprays from leaks</td><td>ticket, not a page — unless the key service is also failing</td></tr>
+        <tr><td class="nm">key_cache_miss_ratio</td><td>A spike means a cold fleet or a key-service outage</td><td>over 5% for 5 min</td></tr>
+        <tr><td class="nm">limit_rejects_total{dim}</td><td>Who is hitting which limit — the first thing support needs</td><td>never; it is a product signal</td></tr>
+        <tr><td class="nm">streams_open · client_aborts_total</td><td>Capacity for the gateway; wasted work for the engine</td><td>open streams over 80% of fleet capacity</td></tr>
+        <tr><td class="nm">upstream_errors_total · retries_total</td><td>A replica or pool going bad before its own alerts fire</td><td>retry budget exhausted for a pool</td></tr>
+      </tbody>
+    </table>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s04"><span>Previous</span>04 — The gateway holds on</a>
+        <a class="seq-next" href="#s06"><span>Next</span>06 — Anatomy of a key</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="3">
+  <div class="part-n">Component 2 of 7</div>
+  <div class="part-t">Key service</div>
+  <p class="part-d">Issues, stores and revokes keys. The gateway asks it only on a cache miss, and otherwise it only pushes — so an outage here is not an outage of inference.</p>
+</div>
+
+<section id="s06">
+  <details open>
+    <summary>
+      <div class="eyebrow">06 — Anatomy of a key</div>
       <h2>Four fields, four jobs</h2>
       <p class="q">What should an API key actually look like?</p>
     </summary>
@@ -871,7 +1173,7 @@ data: [DONE]</pre>
       <div class="spec-id"><span class="pill trustp">prefix</span><h3>Say who issued it</h3></div>
       <div class="spec-grid">
         <div class="spec-item"><span class="k">Format</span><span class="v"><code>nc_live_</code> or <code>nc_test_</code>. Distinctive enough that a regex over all of GitHub has almost no false positives.</span></div>
-        <div class="spec-item"><span class="k">Why</span><span class="v">Registered with secret-scanning programmes, so a key pushed to a public repository is reported to us <b>within minutes</b> and revoked automatically (<a href="#s06">06</a>).</span></div>
+        <div class="spec-item"><span class="k">Why</span><span class="v">Registered with secret-scanning programmes, so a key pushed to a public repository is reported to us <b>within minutes</b> and revoked automatically (<a href="#s08">08</a>).</span></div>
         <div class="spec-item"><span class="k">Also</span><span class="v">Test keys route only to a sandbox pool and can never reach production replicas — the environment is in the key, not in a header someone forgets.</span></div>
       </div>
     </div>
@@ -940,17 +1242,17 @@ version       41                                  <span class="c">-- bumps on ev
 
   <div class="note trust"><b>Compare the HMACs, in constant time.</b> The gateway computes <code>HMAC(pepper, presented_secret)</code> and compares it to the stored value with a constant-time equality. It never compares secrets, never logs them, and strips the <code>Authorization</code> header before anything is written anywhere.</div>
       <nav class="seq">
-        <a class="seq-prev" href="#s03"><span>Previous</span>03 — The latency budget</a>
-        <a class="seq-next" href="#s05"><span>Next</span>05 — Verifying every request</a>
+        <a class="seq-prev" href="#s05"><span>Previous</span>05 — Inside the gateway</a>
+        <a class="seq-next" href="#s07"><span>Next</span>07 — Verifying every request</a>
       </nav>
     </div>
   </details>
 </section>
 
-<section id="s05">
+<section id="s07">
   <details open>
     <summary>
-      <div class="eyebrow">05 — Verifying every request</div>
+      <div class="eyebrow">07 — Verifying every request</div>
       <h2>The key service is not on the request path</h2>
       <p class="q">How do you check a key on every request without asking anyone?</p>
     </summary>
@@ -1023,7 +1325,7 @@ version       41                                  <span class="c">-- bumps on ev
     <p>A cache that is only refreshed on a timer makes revocation as slow as the timer. So changes are pushed, and the timer exists only to bound the case where a push is missed.</p>
   </div>
   <div class="walk">
-    <div><b>t+0</b><span>A key is revoked — by its owner, by support, or by the scanner in <a href="#s06">06</a>. The key service writes <code>status=revoked</code> and bumps <code>version</code>.</span></div>
+    <div><b>t+0</b><span>A key is revoked — by its owner, by support, or by the scanner in <a href="#s08">08</a>. The key service writes <code>status=revoked</code> and bumps <code>version</code>.</span></div>
     <div><b>t+50ms</b><span>The change is published on a fan-out bus that every gateway subscribes to. Each drops its cached entry.</span></div>
     <div><b>t+100ms</b><span>Each gateway also looks up <em>in-flight streams</em> for that key and ends them with a <code>key_revoked</code> error event. Revocation stops work in flight, not just new requests.</span></div>
     <div><b>≤ 60 s</b><span>A gateway that was partitioned from the bus re-fetches every entry older than its TTL. This is the hard worst case, and it only applies to a gateway that is already unhealthy.</span></div>
@@ -1046,17 +1348,17 @@ version       41                                  <span class="c">-- bumps on ev
     <p>An attacker who can’t guess a key can still try to make checking keys expensive. Three cheap layers stop that: a per-IP and per-/24 limiter <em>before</em> authentication, a failed-auth counter that tightens the limiter for sources that keep failing, and the negative cache, which turns repeated forged IDs into memory lookups. None of this touches a GPU — the most a spray can cost is gateway CPU, which is the cheapest thing in the building.</p>
   </div>
       <nav class="seq">
-        <a class="seq-prev" href="#s04"><span>Previous</span>04 — Anatomy of a key</a>
-        <a class="seq-next" href="#s06"><span>Next</span>06 — When a key leaks</a>
+        <a class="seq-prev" href="#s06"><span>Previous</span>06 — Anatomy of a key</a>
+        <a class="seq-next" href="#s08"><span>Next</span>08 — When a key leaks</a>
       </nav>
     </div>
   </details>
 </section>
 
-<section id="s06">
+<section id="s08">
   <details open>
     <summary>
-      <div class="eyebrow">06 — When a key leaks</div>
+      <div class="eyebrow">08 — When a key leaks</div>
       <h2>Decide the blast radius before the leak</h2>
       <p class="q">What limits the damage when a key ends up on GitHub?</p>
     </summary>
@@ -1066,10 +1368,10 @@ version       41                                  <span class="c">-- bumps on ev
   <div class="ladder">
     <div class="rung"><span class="n">1</span><div><h3>Secret scanning</h3><p>The prefix is registered with scanning programmes. A match in a public repository is reported, verified by checksum, and the key is <b>revoked automatically</b> with an email to the owner. This catches the most common leak in minutes, with nobody awake.</p></div></div>
     <div class="rung"><span class="n">2</span><div><h3>Scope</h3><p>Keys belong to a project and can be limited to named models. A leaked key for an internal tool that only calls an 8B model <b>cannot call the 671B one</b>.</p></div></div>
-    <div class="rung"><span class="n">3</span><div><h3>Per-key quota</h3><p>A daily and monthly token quota on each key, enforced by the same buckets as the tenant’s limits (<a href="#s08">08</a>) and separate from them. A tenant with a very large allowance can still say this key may use <b>20M tokens a day</b>.</p></div></div>
+    <div class="rung"><span class="n">3</span><div><h3>Per-key quota</h3><p>A daily and monthly token quota on each key, enforced by the same buckets as the tenant’s limits (<a href="#s09">09</a>) and separate from them. A tenant with a very large allowance can still say this key may use <b>20M tokens a day</b>.</p></div></div>
     <div class="rung"><span class="n">4</span><div><h3>Network allowlist</h3><p>Optional CIDR allowlist per key. For server-side keys this makes a leak nearly harmless — the key works only from the customer’s own egress addresses.</p></div></div>
     <div class="rung"><span class="n">5</span><div><h3>Velocity anomaly</h3><p>Each key’s token rate is compared to its own recent history. Ten times its 7-day p99 sustained for five minutes moves the key to <code>throttled</code> — limits drop to baseline, the owner is notified — rather than <code>revoked</code>. <b>Throttling is reversible</b>; a false positive costs the customer latency, not an outage.</p></div></div>
-    <div class="rung"><span class="n">6</span><div><h3>Revocation</h3><p>Pushed to every gateway in well under a second, with in-flight streams ended too (<a href="#s05">05</a>). Rotation is painless because a project can hold several active keys at once.</p></div></div>
+    <div class="rung"><span class="n">6</span><div><h3>Revocation</h3><p>Pushed to every gateway in well under a second, with in-flight streams ended too (<a href="#s07">07</a>). Rotation is painless because a project can hold several active keys at once.</p></div></div>
   </div>
 
   <div class="sub">
@@ -1082,179 +1384,140 @@ version       41                                  <span class="c">-- bumps on ev
   "project":  "prj_9Hx…",
   "key_id":   "k7Qm2xPz9aLr4TbV",          <span class="c"># for usage records and audit</span>
   "request":  "req_01J9…",                  <span class="c"># for tracing and abort</span>
-  "class":    "interactive",                <span class="c"># or batch — used by the fair queue (08)</span>
+  "class":    "interactive",                <span class="c"># or batch — used by the fair queue (13)</span>
   "weight":   4,                            <span class="c"># tier weight in the scheduler</span>
-  "salt":     "a91f…",                      <span class="c"># prefix-cache salt, per tenant (08)</span>
+  "salt":     "a91f…",                      <span class="c"># prefix-cache salt, per tenant (12)</span>
   "exp":      1759219800                    <span class="c"># max stream duration + margin</span>
 }</pre>
 
   <div class="note trust"><b>Defence in depth, stated plainly:</b> if an attacker got inside the cluster network they would still need a gateway’s workload certificate to reach a replica, and a gateway’s signing key to make a replica do work on someone else’s account. Neither is on disk; both rotate hourly.</div>
       <nav class="seq">
-        <a class="seq-prev" href="#s05"><span>Previous</span>05 — Verifying every request</a>
-        <a class="seq-next" href="#s07"><span>Next</span>07 — Inside one replica</a>
+        <a class="seq-prev" href="#s07"><span>Previous</span>07 — Verifying every request</a>
+        <a class="seq-next" href="#s09"><span>Next</span>09 — One limit, many gateways</a>
       </nav>
     </div>
   </details>
 </section>
 
-<div class="part" data-part="3">
-  <div class="part-n">Part III</div>
-  <div class="part-t">Sharing a GPU fairly</div>
-  <p class="part-d">Everyone’s requests end up in the same batch on the same replica. Gateway limits decide who gets in the door; what happens inside the engine decides whether one customer can make everyone else slow.</p>
+<div class="part" data-part="4">
+  <div class="part-n">Component 3 of 7</div>
+  <div class="part-t">Limit service</div>
+  <p class="part-d">Turns each tenant’s limits into a share per gateway, every second. Soft state, no database, and every failure falls back to admitting less.</p>
 </div>
-
-<section id="s07">
-  <details open>
-    <summary>
-      <div class="eyebrow">07 — Inside one replica</div>
-      <h2>Memory runs out before compute does</h2>
-      <p class="q">What is the scarce resource on a shared replica?</p>
-    </summary>
-    <div class="sec-body">
-      <p class="lede">A replica does two very different kinds of work, and the thing they compete for is not FLOPs but the KV cache — gigabytes of per-sequence state that must stay in GPU memory for as long as a stream is alive.</p>
-
-  <div class="duo">
-    <div class="card gpuc">
-      <div class="tag" style="color:var(--gpu)">Prefill</div>
-      <h3>Read the prompt</h3>
-      <ul>
-        <li>All prompt tokens processed in parallel, in one pass.</li>
-        <li><b>Compute-bound</b>: large matrix multiplies, GPU busy.</li>
-        <li>Writes the prompt’s keys and values into the KV cache.</li>
-        <li>Sets time to first token. A long prompt makes it long.</li>
-      </ul>
-    </div>
-    <div class="card gpuc">
-      <div class="tag" style="color:var(--gpu)">Decode</div>
-      <h3>Write the answer</h3>
-      <ul>
-        <li>One token per sequence per step, every sequence in the batch together.</li>
-        <li><b>Memory-bandwidth-bound</b>: every step reads all the weights and each sequence’s KV cache.</li>
-        <li>Batching is almost free until the KV cache is full.</li>
-        <li>Sets inter-token latency — what streaming feels like.</li>
-      </ul>
-    </div>
-  </div>
-
-  <p class="body">Continuous batching lets sequences join and leave the batch on every step, so the batch stays full. What limits how full it can get is how many tokens of KV cache fit in memory. The size per token is fixed by the model’s architecture:</p>
-  <pre class="code"><span class="c"># bytes of KV cache per token</span>
-<span class="h">2 × layers × kv_heads × head_dim × bytes_per_value</span>          <span class="c"># 2 = one K and one V</span></pre>
-
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>Model</th><th>Layers</th><th>KV heads × dim</th><th>Per token · bf16</th><th>One 32k-token context</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">Llama 3.1 8B</td><td class="num">32</td><td class="num">8 × 128</td><td class="num">128 KiB</td><td class="num">4 GiB</td></tr>
-        <tr><td class="nm">Qwen2.5 32B</td><td class="num">64</td><td class="num">8 × 128</td><td class="num">256 KiB</td><td class="num">8 GiB</td></tr>
-        <tr><td class="nm">Llama 3.3 70B</td><td class="num">80</td><td class="num">8 × 128</td><td class="num">320 KiB</td><td class="num">10 GiB</td></tr>
-        <tr><td class="nm">Mixtral 8×22B</td><td class="num">56</td><td class="num">8 × 128</td><td class="num">224 KiB</td><td class="num">7 GiB</td></tr>
-        <tr><td class="nm">DeepSeek-V3 (MLA)</td><td class="num">61</td><td class="num">1 latent × 576</td><td class="num">~69 KiB</td><td class="num">~2.1 GiB</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <figure>
-    <svg viewBox="0 0 960 170" role="img" aria-label="KV cache of one 70B replica, about 229 thousand tokens. One tenant's single 128 thousand token request takes 56 percent; forty other chats take 35 percent; 9 percent is free.">
-      <text class="s-ts" x="40" y="26">KV cache · Llama 3.3 70B · FP8 weights on 2 × H100 · ~75 GB left for KV ≈ 229k tokens</text>
-      <rect class="s-box" x="40" y="40" width="880" height="48" rx="6"/>
-      <rect x="40" y="40" width="493" height="48" rx="6" style="fill:var(--trust-wash);stroke:var(--trust);stroke-width:1.5"/>
-      <rect x="533" y="40" width="308" height="48" style="fill:var(--gpu-wash);stroke:var(--gpu);stroke-width:1.5"/>
-      <text class="s-t" x="54" y="62">tenant A · one request · 128k tokens</text>
-      <text class="s-ts" x="54" y="79">56% of the replica</text>
-      <text class="s-t" x="547" y="62">40 chats · 12 tenants</text>
-      <text class="s-ts" x="547" y="79">2k tokens each · 35%</text>
-      <text class="s-ts" x="850" y="69">9% free</text>
-      <text class="s-ts" x="40" y="118">The next few short chats fit. A second long request from anyone does not: it waits, or the engine preempts sequences to make room.</text>
-      <text class="s-ts" x="40" y="138">Tenant A is well inside any request-per-second limit. It is using one request a minute.</text>
-      <text class="s-ts" x="40" y="158">This is how one customer wrecks a shared replica — not with traffic, with memory.</text>
-    </svg>
-    <figcaption>Blocks are allocated in pages of 16 tokens (<b>PagedAttention</b>), so there is no fragmentation — but nothing stops one sequence taking most of the pages. That is the gap section 08 closes.</figcaption>
-  </figure>
-
-  <div class="sub">
-    <h3>Chunked prefill: long prompts can’t freeze the batch</h3>
-    <p>A 100k-token prompt prefilled in one pass stalls every decoding sequence on that replica for the length of the pass — hundreds of milliseconds of frozen streams for everyone else. Chunked prefill splits it into pieces of a few thousand tokens and interleaves them with decode steps, so the long request takes slightly longer and nobody else notices. The chunk size is a direct trade between one tenant’s time to first token and everyone else’s inter-token latency; it is set per pool.</p>
-  </div>
-      <nav class="seq">
-        <a class="seq-prev" href="#s06"><span>Previous</span>06 — When a key leaks</a>
-        <a class="seq-next" href="#s08"><span>Next</span>08 — Three layers of isolation</a>
-      </nav>
-    </div>
-  </details>
-</section>
-
-<section id="s08">
-  <details open>
-    <summary>
-      <div class="eyebrow">08 — Three layers of isolation</div>
-      <h2>Rate limits are necessary and nowhere near sufficient</h2>
-      <p class="q">How do you stop one tenant making the service slow for everyone else?</p>
-    </summary>
-    <div class="sec-body">
-      <p class="lede">A tenant can stay within every request limit and still take over a replica, because requests are not the unit of cost. Isolation needs a layer at the door, a layer in the scheduler, and a layer in memory — each denominated in tokens.</p>
-
-  <div class="specs">
-    <div class="spec">
-      <div class="spec-id"><span class="pill edgep">layer 1 · gateway</span><h3>Limits at the door</h3></div>
-      <div class="spec-grid">
-        <div class="spec-item"><span class="k">Limits</span><span class="v">Requests per minute, <b>input tokens per minute</b>, <b>output tokens per minute</b> (counted as the stream runs), concurrent streams — per tenant, per model, per tier.</span></div>
-        <div class="spec-item"><span class="k">Implementation</span><span class="v">Local token buckets. Each gateway holds a share of the tenant’s limit; a limit service rebalances the shares every second in proportion to each gateway’s recent traffic for that tenant.</span></div>
-        <div class="spec-item"><span class="k">Stops</span><span class="v">Floods, runaway retry loops, a leaked key being hammered.</span></div>
-        <div class="spec-item"><span class="k">Doesn’t stop</span><span class="v">A few enormous requests, or a burst that lands on one replica.</span></div>
-      </div>
-    </div>
-    <div class="spec">
-      <div class="spec-id"><span class="pill gpup">layer 2 · scheduler</span><h3>A fair queue in the engine</h3></div>
-      <div class="spec-grid">
-        <div class="spec-item"><span class="k">Idea</span><span class="v">Each tenant has a counter of service received, in weighted tokens. The next slot in the batch goes to the waiting tenant with the <b>lowest counter per unit of weight</b> — the Virtual Token Counter.</span></div>
-        <div class="spec-item"><span class="k">Why tokens</span><span class="v">Counting requests lets a tenant with 50k-token prompts take fifty times its share while looking fair.</span></div>
-        <div class="spec-item"><span class="k">Weights</span><span class="v">Tier and priority class: interactive over batch, paid tiers over free.</span></div>
-        <div class="spec-item"><span class="k">Stops</span><span class="v">One tenant’s queue starving everyone else’s at a busy replica.</span></div>
-      </div>
-    </div>
-    <div class="spec">
-      <div class="spec-id"><span class="pill gpup">layer 3 · memory</span><h3>KV caps and preemption</h3></div>
-      <div class="spec-grid">
-        <div class="spec-item"><span class="k">Cap</span><span class="v">While anyone else is waiting, a tenant may hold at most its fair share of KV blocks. When nobody is waiting it can use everything — <b>work-conserving</b>, so the cap costs nothing when idle.</span></div>
-        <div class="spec-item"><span class="k">Preemption</span><span class="v">When memory runs out, evict from the tenant furthest over its share, not from whoever arrived last. Short sequences are recomputed; long ones are swapped to host memory.</span></div>
-        <div class="spec-item"><span class="k">Stops</span><span class="v">The 128k-token request in <a href="#s07">07</a> taking the replica.</span></div>
-        <div class="spec-item"><span class="k">Oversized requests</span><span class="v">A request bigger than a fair share still runs — when the queue is clear, or on a larger replica shape. The catalog caps each pool’s context length at what its replicas can hold without starving everyone else.</span></div>
-      </div>
-    </div>
-  </div>
-
-  <pre class="code"><span class="c"># per replica · runs each scheduler step, before the batch is formed</span>
-on request from tenant t, when t had nothing waiting:
-    counter[t] = max(counter[t], min(counter[u] for u in waiting))   <span class="c"># idle time can’t be banked</span>
-
-while batch has free slots and free KV blocks:
-    t = argmin(counter[u] / weight[u] for u in waiting)
-    r = next_request(t)
-    if others_waiting and kv_used[t] + blocks(r) &gt; fair_share(t):
-        skip t this step                                             <span class="c"># layer 3</span>
-    admit r
-
-after each step:
-    counter[t] += w_in × prefill_tokens[t] + w_out × decode_tokens[t]   <span class="c"># w_out &gt; w_in: decode holds memory longer</span></pre>
-
-  <div class="sub">
-    <h3>The prefix cache is a side channel</h3>
-    <p>Prefix caching keeps the KV blocks of a finished request so the next request with the same beginning skips its prefill. Across tenants that is a timing oracle: if my request for a guessed prompt comes back fast, someone else sent it recently. So every cache key is salted with the tenant — vLLM’s <code>cache_salt</code> exists for exactly this — and hits are only possible within one tenant. The cost is losing shared hits on common public system prompts, which is a small price for not leaking one customer’s prompts to another.</p>
-  </div>
-
-  <div class="note gpu"><b>Why all three:</b> layer 1 alone lets a tenant within limits take a replica with a few large requests. Layer 2 alone decides who goes next but not how much memory they hold once admitted. Layer 3 alone protects memory but does nothing about queue order. Each closes the hole the other two leave.</div>
-      <nav class="seq">
-        <a class="seq-prev" href="#s07"><span>Previous</span>07 — Inside one replica</a>
-        <a class="seq-next" href="#s09"><span>Next</span>09 — Choosing a replica</a>
-      </nav>
-    </div>
-  </details>
-</section>
 
 <section id="s09">
   <details open>
     <summary>
-      <div class="eyebrow">09 — Choosing a replica</div>
+      <div class="eyebrow">09 — One limit, many gateways</div>
+      <h2>Shares that follow the traffic</h2>
+      <p class="q">How do twelve gateways enforce one tenant’s limit without asking each other?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A tenant’s limit is one number, but its traffic lands on whichever gateways its connections happen to reach — and with HTTP keep-alive, a tenant with a handful of long-lived connections may be on two gateways out of twelve. The limit service keeps each gateway’s share of every limit in proportion to where the traffic actually is.</p>
+
+  <div class="duo">
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Static split · L ÷ G</div>
+      <h3>Local and wrong</h3>
+      <ul>
+        <li>Every gateway admits one twelfth of the limit. No coordination at all.</li>
+        <li>A tenant pinned to 2 gateways gets <b>2⁄12 of what it paid for</b> — six times too strict.</li>
+        <li>Still useful as the <b>fallback</b>: it always sums to exactly L.</li>
+      </ul>
+    </div>
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Central counter · INCR per request</div>
+      <h3>Exact and on the path</h3>
+      <ul>
+        <li>A Redis round-trip per admission and per chunk — breaking the budget in <a href="#s02">02</a>.</li>
+        <li>One hot key per large tenant, on one shard.</li>
+        <li>An outage of the counter is an outage of admission.</li>
+      </ul>
+    </div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 960 290" role="img" aria-label="Three gateways report their demand for one tenant each second; the limit service returns shares proportional to demand, with a small floor for every gateway.">
+      <g class="edge">
+        <rect class="s-card" x="40" y="40" width="210" height="56" rx="10"/>
+        <rect class="s-card" x="40" y="118" width="210" height="56" rx="10"/>
+        <rect class="s-card" x="40" y="196" width="210" height="56" rx="10"/>
+        <rect class="s-card" x="370" y="115" width="200" height="62" rx="10"/>
+        <line class="s-dash" x1="250" y1="68" x2="367" y2="136" marker-start="url(#ah-edge)" marker-end="url(#ah-edge)"/>
+        <line class="s-dash" x1="250" y1="146" x2="367" y2="146" marker-start="url(#ah-edge)" marker-end="url(#ah-edge)"/>
+        <line class="s-dash" x1="250" y1="224" x2="367" y2="156" marker-start="url(#ah-edge)" marker-end="url(#ah-edge)"/>
+      </g>
+      <text class="s-t" x="56" y="64">gateway a</text>
+      <text class="s-ts" x="56" y="82">used 1.30M · denied 0.10M</text>
+      <text class="s-t" x="56" y="142">gateway b</text>
+      <text class="s-ts" x="56" y="160">used 0.55M · denied 0</text>
+      <text class="s-t" x="56" y="220">gateway c</text>
+      <text class="s-ts" x="56" y="238">used 0 · denied 0</text>
+      <text class="s-tb s-tm" x="470" y="141" style="fill:var(--edge)">limit service</text>
+      <text class="s-ts s-tm" x="470" y="160">every 1 s · soft state</text>
+      <text class="s-ts s-tm" x="308" y="30">demand ↑ · share ↓</text>
+
+      <text class="s-ts" x="620" y="60">tenant T · input tokens · limit 2M / min</text>
+      <rect class="s-box" x="620" y="72" width="300" height="34" rx="5"/>
+      <rect x="620" y="72" width="210" height="34" rx="5" style="fill:var(--edge)"/>
+      <rect x="830" y="72" width="85" height="34" style="fill:var(--edge-wash);stroke:var(--edge);stroke-width:1"/>
+      <rect x="915" y="72" width="5" height="34" style="fill:var(--sunk);stroke:var(--rule)"/>
+      <text class="s-ts" x="628" y="94" style="fill:var(--paper)">a · 1.40M</text>
+      <text class="s-ts" x="836" y="94">b · 0.57M</text>
+      <text class="s-ts" x="620" y="128">c keeps a floor · 0.03M</text>
+      <text class="s-ts" x="620" y="178">Σ shares = limit, every round</text>
+      <text class="s-ts" x="620" y="198">a was denied, so its demand counts more</text>
+      <text class="s-ts" x="620" y="218">than it used — shares move towards need</text>
+    </svg>
+    <figcaption>Each gateway reports, per active tenant and limit, what it <b>used</b> and what it <b>denied</b> in the last second. Denied demand counts, so a gateway that is turning traffic away gets a larger share next round. The shares always add up to the limit.</figcaption>
+  </figure>
+
+  <pre class="code"><span class="c"># limit service · every second · for each tenant T and dimension d with any recent demand</span>
+L       = limit[T][d] / 60                       <span class="c"># per-second rate from a per-minute limit</span>
+G       = gateways_alive
+demand  = { g: used[g] + denied[g] for g in G }  <span class="c"># what g would have admitted</span>
+floor   = 0.05 × L / |G|                         <span class="c"># every gateway can admit a trickle</span>
+spread  = L − |G| × floor
+share[g]= floor + spread × demand[g] / Σ demand  <span class="c"># Σ share = L exactly</span>
+push { T, d, share[g], ver } to each g           <span class="c"># gateway sets bucket rate = share, burst = share × 10 s</span></pre>
+
+  <div class="sub">
+    <h3>Counts, not only rates</h3>
+    <p>Concurrent-stream limits are integers, and a limit of 8 streams can’t be split twelve ways. For these the service hands out whole slots only to gateways with demand, moving a slot when one gateway has queued work and another has a slot idle. Per-key daily quotas (<a href="#s08">08</a>) are one more dimension, the only one with memory: their running totals are checkpointed every few seconds, so a restart loses seconds of accounting, not a day.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Situation</th><th>What happens</th><th>Worst case</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">steady state</td><td>Shares sum to the limit; buckets allow a 10 s burst</td><td>one burst above the rate, as with any token bucket</td></tr>
+        <tr><td class="nm">traffic moves</td><td>New shares arrive within a second; the old, larger share is spent until then</td><td>≤ 1 s of the share that moved</td></tr>
+        <tr><td class="nm">gateway cut off</td><td>Keeps its last share for 10 s, then falls back to the static split L ÷ G</td><td>the tenant is admitted less, never more</td></tr>
+        <tr><td class="nm">limit service down</td><td>Every gateway falls back to L ÷ G after 10 s</td><td>pinned tenants are throttled early until it returns</td></tr>
+        <tr><td class="nm">gateway added</td><td>Joins the next round at the floor, grows with its demand</td><td>one round of under-admission for its tenants</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><b>Why this can be soft state:</b> nothing here is money, and every failure falls back to a split that sums to the limit. The service keeps no database — it rebuilds from two rounds of gateway reports after a restart — and runs as a leader with a warm standby. At 12 gateways and a few thousand active tenants it recomputes on the order of a hundred thousand shares a second, which is arithmetic, not infrastructure.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s08"><span>Previous</span>08 — When a key leaks</a>
+        <a class="seq-next" href="#s10"><span>Next</span>10 — Choosing a replica</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="5">
+  <div class="part-n">Component 4 of 7</div>
+  <div class="part-t">Router</div>
+  <p class="part-d">A library inside the gateway, not a network hop: it picks a replica from live engine metrics and prefix affinity.</p>
+</div>
+
+<section id="s10">
+  <details open>
+    <summary>
+      <div class="eyebrow">10 — Choosing a replica</div>
       <h2>The least-loaded of two, unless the cache is warm</h2>
       <p class="q">Which replica should this request go to?</p>
     </summary>
@@ -1316,23 +1579,337 @@ score(r)  = queue[r] + inflight_from_me[r]          <span class="c"># snapshot +
 send to argmin(score(a), score(b))</pre>
   <p class="body">This is the job the Kubernetes Gateway API Inference Extension calls an endpoint picker, and llm-d and Dynamo ship variants of it. The scoring weights are per pool: an 8B pool with short chats barely benefits from affinity, while a pool serving agent traffic with 20k-token shared system prompts can skip most of its prefill work with it.</p>
       <nav class="seq">
-        <a class="seq-prev" href="#s08"><span>Previous</span>08 — Three layers of isolation</a>
-        <a class="seq-next" href="#s10"><span>Next</span>10 — What to scale on</a>
+        <a class="seq-prev" href="#s09"><span>Previous</span>09 — One limit, many gateways</a>
+        <a class="seq-next" href="#s11"><span>Next</span>11 — Inside one replica</a>
       </nav>
     </div>
   </details>
 </section>
 
-<div class="part" data-part="4">
-  <div class="part-n">Part IV</div>
-  <div class="part-t">Capacity that follows demand</div>
-  <p class="part-d">A web tier scales in seconds on CPU. An inference pool scales in minutes, on signals that CPU knows nothing about, across ten models that all want the same scarce GPUs.</p>
+<div class="part" data-part="6">
+  <div class="part-n">Component 5 of 7</div>
+  <div class="part-t">Engine</div>
+  <p class="part-d">A vLLM replica and the admission queue beside it. This is where memory runs out, and where fairness is actually decided.</p>
 </div>
 
-<section id="s10">
+<section id="s11">
   <details open>
     <summary>
-      <div class="eyebrow">10 — What to scale on</div>
+      <div class="eyebrow">11 — Inside one replica</div>
+      <h2>Memory runs out before compute does</h2>
+      <p class="q">What is the scarce resource on a shared replica?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A replica does two very different kinds of work, and the thing they compete for is not FLOPs but the KV cache — gigabytes of per-sequence state that must stay in GPU memory for as long as a stream is alive.</p>
+
+  <div class="duo">
+    <div class="card gpuc">
+      <div class="tag" style="color:var(--gpu)">Prefill</div>
+      <h3>Read the prompt</h3>
+      <ul>
+        <li>All prompt tokens processed in parallel, in one pass.</li>
+        <li><b>Compute-bound</b>: large matrix multiplies, GPU busy.</li>
+        <li>Writes the prompt’s keys and values into the KV cache.</li>
+        <li>Sets time to first token. A long prompt makes it long.</li>
+      </ul>
+    </div>
+    <div class="card gpuc">
+      <div class="tag" style="color:var(--gpu)">Decode</div>
+      <h3>Write the answer</h3>
+      <ul>
+        <li>One token per sequence per step, every sequence in the batch together.</li>
+        <li><b>Memory-bandwidth-bound</b>: every step reads all the weights and each sequence’s KV cache.</li>
+        <li>Batching is almost free until the KV cache is full.</li>
+        <li>Sets inter-token latency — what streaming feels like.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="body">Continuous batching lets sequences join and leave the batch on every step, so the batch stays full. What limits how full it can get is how many tokens of KV cache fit in memory. The size per token is fixed by the model’s architecture:</p>
+  <pre class="code"><span class="c"># bytes of KV cache per token</span>
+<span class="h">2 × layers × kv_heads × head_dim × bytes_per_value</span>          <span class="c"># 2 = one K and one V</span></pre>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Layers</th><th>KV heads × dim</th><th>Per token · bf16</th><th>One 32k-token context</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Llama 3.1 8B</td><td class="num">32</td><td class="num">8 × 128</td><td class="num">128 KiB</td><td class="num">4 GiB</td></tr>
+        <tr><td class="nm">Qwen2.5 32B</td><td class="num">64</td><td class="num">8 × 128</td><td class="num">256 KiB</td><td class="num">8 GiB</td></tr>
+        <tr><td class="nm">Llama 3.3 70B</td><td class="num">80</td><td class="num">8 × 128</td><td class="num">320 KiB</td><td class="num">10 GiB</td></tr>
+        <tr><td class="nm">Mixtral 8×22B</td><td class="num">56</td><td class="num">8 × 128</td><td class="num">224 KiB</td><td class="num">7 GiB</td></tr>
+        <tr><td class="nm">DeepSeek-V3 (MLA)</td><td class="num">61</td><td class="num">1 latent × 576</td><td class="num">~69 KiB</td><td class="num">~2.1 GiB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 960 170" role="img" aria-label="KV cache of one 70B replica, about 229 thousand tokens. One tenant's single 128 thousand token request takes 56 percent; forty other chats take 35 percent; 9 percent is free.">
+      <text class="s-ts" x="40" y="26">KV cache · Llama 3.3 70B · FP8 weights on 2 × H100 · ~75 GB left for KV ≈ 229k tokens</text>
+      <rect class="s-box" x="40" y="40" width="880" height="48" rx="6"/>
+      <rect x="40" y="40" width="493" height="48" rx="6" style="fill:var(--trust-wash);stroke:var(--trust);stroke-width:1.5"/>
+      <rect x="533" y="40" width="308" height="48" style="fill:var(--gpu-wash);stroke:var(--gpu);stroke-width:1.5"/>
+      <text class="s-t" x="54" y="62">tenant A · one request · 128k tokens</text>
+      <text class="s-ts" x="54" y="79">56% of the replica</text>
+      <text class="s-t" x="547" y="62">40 chats · 12 tenants</text>
+      <text class="s-ts" x="547" y="79">2k tokens each · 35%</text>
+      <text class="s-ts" x="850" y="69">9% free</text>
+      <text class="s-ts" x="40" y="118">The next few short chats fit. A second long request from anyone does not: it waits, or the engine preempts sequences to make room.</text>
+      <text class="s-ts" x="40" y="138">Tenant A is well inside any request-per-second limit. It is using one request a minute.</text>
+      <text class="s-ts" x="40" y="158">This is how one customer wrecks a shared replica — not with traffic, with memory.</text>
+    </svg>
+    <figcaption>Blocks are allocated in pages of 16 tokens (<b>PagedAttention</b>), so there is no fragmentation — but nothing stops one sequence taking most of the pages. That is the gap sections 12 and 13 close.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>Chunked prefill: long prompts can’t freeze the batch</h3>
+    <p>A 100k-token prompt prefilled in one pass stalls every decoding sequence on that replica for the length of the pass — hundreds of milliseconds of frozen streams for everyone else. Chunked prefill splits it into pieces of a few thousand tokens and interleaves them with decode steps, so the long request takes slightly longer and nobody else notices. The chunk size is a direct trade between one tenant’s time to first token and everyone else’s inter-token latency; it is set per pool.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s10"><span>Previous</span>10 — Choosing a replica</a>
+        <a class="seq-next" href="#s12"><span>Next</span>12 — Three layers of isolation</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s12">
+  <details open>
+    <summary>
+      <div class="eyebrow">12 — Three layers of isolation</div>
+      <h2>Rate limits are necessary and nowhere near sufficient</h2>
+      <p class="q">How do you stop one tenant making the service slow for everyone else?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A tenant can stay within every request limit and still take over a replica, because requests are not the unit of cost. Isolation needs a layer at the door, a layer in the scheduler, and a layer in memory — each denominated in tokens.</p>
+
+  <div class="specs">
+    <div class="spec">
+      <div class="spec-id"><span class="pill edgep">layer 1 · gateway</span><h3>Limits at the door</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Limits</span><span class="v">Requests per minute, <b>input tokens per minute</b>, <b>output tokens per minute</b> (counted as the stream runs), concurrent streams — per tenant, per model, per tier.</span></div>
+        <div class="spec-item"><span class="k">Implementation</span><span class="v">Local token buckets. Each gateway holds a share of the tenant’s limit; a limit service rebalances the shares every second in proportion to each gateway’s recent traffic for that tenant (<a href="#s09">09</a>).</span></div>
+        <div class="spec-item"><span class="k">Stops</span><span class="v">Floods, runaway retry loops, a leaked key being hammered.</span></div>
+        <div class="spec-item"><span class="k">Doesn’t stop</span><span class="v">A few enormous requests, or a burst that lands on one replica.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill gpup">layer 2 · scheduler</span><h3>A fair queue in the engine</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Idea</span><span class="v">Each tenant has a counter of service received, in weighted tokens. The next slot in the batch goes to the waiting tenant with the <b>lowest counter per unit of weight</b> — the Virtual Token Counter.</span></div>
+        <div class="spec-item"><span class="k">Why tokens</span><span class="v">Counting requests lets a tenant with 50k-token prompts take fifty times its share while looking fair.</span></div>
+        <div class="spec-item"><span class="k">Weights</span><span class="v">Tier and priority class: interactive over batch, paid tiers over free.</span></div>
+        <div class="spec-item"><span class="k">Stops</span><span class="v">One tenant’s queue starving everyone else’s at a busy replica.</span></div>
+        <div class="spec-item"><span class="k">Specified</span><span class="v">In full in <a href="#s13">13</a>: where it runs, what it charges, its parameters and its tests.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill gpup">layer 3 · memory</span><h3>KV caps and preemption</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Cap</span><span class="v">While anyone else is waiting, a tenant may hold at most its fair share of KV blocks. When nobody is waiting it can use everything — <b>work-conserving</b>, so the cap costs nothing when idle.</span></div>
+        <div class="spec-item"><span class="k">Preemption</span><span class="v">When memory runs out, evict from the tenant furthest over its share, not from whoever arrived last. Short sequences are recomputed; long ones are swapped to host memory.</span></div>
+        <div class="spec-item"><span class="k">Stops</span><span class="v">The 128k-token request in <a href="#s11">11</a> taking the replica.</span></div>
+        <div class="spec-item"><span class="k">Oversized requests</span><span class="v">A request bigger than a fair share still runs — when the queue is clear, or on a larger replica shape. The catalog caps each pool’s context length at what its replicas can hold without starving everyone else.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <pre class="code"><span class="c"># the idea in fifteen lines · the full design is section 13</span>
+on request from tenant t, when t had nothing waiting:
+    counter[t] = max(counter[t], min(counter[u] for u in waiting))   <span class="c"># idle time can’t be banked</span>
+
+while batch has free slots and free KV blocks:
+    t = argmin(counter[u] / weight[u] for u in waiting)
+    r = next_request(t)
+    if others_waiting and kv_used[t] + blocks(r) &gt; fair_share(t):
+        skip t this step                                             <span class="c"># layer 3</span>
+    admit r
+
+after each step:
+    counter[t] += w_in × prefill_tokens[t] + w_out × decode_tokens[t]   <span class="c"># w_out &gt; w_in: decode holds memory longer</span></pre>
+
+  <div class="sub">
+    <h3>The prefix cache is a side channel</h3>
+    <p>Prefix caching keeps the KV blocks of a finished request so the next request with the same beginning skips its prefill. Across tenants that is a timing oracle: if my request for a guessed prompt comes back fast, someone else sent it recently. So every cache key is salted with the tenant — vLLM’s <code>cache_salt</code> exists for exactly this — and hits are only possible within one tenant. The cost is losing shared hits on common public system prompts, which is a small price for not leaking one customer’s prompts to another.</p>
+  </div>
+
+  <div class="note gpu"><b>Why all three:</b> layer 1 alone lets a tenant within limits take a replica with a few large requests. Layer 2 alone decides who goes next but not how much memory they hold once admitted. Layer 3 alone protects memory but does nothing about queue order. Each closes the hole the other two leave.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s11"><span>Previous</span>11 — Inside one replica</a>
+        <a class="seq-next" href="#s13"><span>Next</span>13 — The fair-queue scheduler</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s13">
+  <details open>
+    <summary>
+      <div class="eyebrow">13 — The fair-queue scheduler</div>
+      <h2>A queue in front of the engine, not a fork of it</h2>
+      <p class="q">Exactly how does a replica decide whose request runs next?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">vLLM schedules first-come-first-served, optionally by a per-request priority. Neither knows what a tenant is. Fairness is added by an admission queue beside each engine that holds requests back and releases them in fair order — so the engine’s own queue stays nearly empty and its scheduler only ever chooses among requests that are already fair to run.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Where fairness lives</th><th>Control</th><th>Cost</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">patch the engine scheduler</td><td>Everything: batch order, per-step token budget, preemption victims</td><td>A fork of the fastest-moving code in the stack, rebased every release</td><td><span class="pill trustp">not now</span></td></tr>
+        <tr><td class="nm">engine priority only</td><td>Class ordering and preemption order, via vLLM’s priority policy</td><td>None — but a priority is fixed at submission and knows nothing of tenants</td><td><span class="pill ctlp">use for class</span></td></tr>
+        <tr><td class="nm">admission queue in front</td><td>Who is submitted, when, and how much memory each tenant holds</td><td>A sidecar on localhost; submission is a little coarser than per step</td><td><span class="pill gpup">recommended</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="wide">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="Engine pod: requests from the router enter per-tenant queues in an admission sidecar; the tenant with the lowest counter per unit weight is picked; a capacity gate releases it to vLLM only when the engine's own queue is nearly empty and there is KV headroom.">
+      <rect class="s-box" x="20" y="140" width="100" height="56" rx="10"/>
+      <text class="s-t s-tm" x="70" y="165">router</text>
+      <text class="s-ts s-tm" x="70" y="182">from gateway</text>
+      <rect class="s-zone" x="150" y="30" width="830" height="284" rx="14"/>
+      <text class="s-ts" x="164" y="50">engine pod · one per replica</text>
+      <rect class="s-box" x="170" y="62" width="400" height="236" rx="10"/>
+      <text class="s-ts" x="184" y="82">admission queue · sidecar · localhost</text>
+
+      <rect class="s-box" x="185" y="94" width="370" height="36" rx="6"/>
+      <text class="s-t" x="197" y="117">A · w 4 · 1.20M → 0.30M</text>
+      <g class="gpu"><rect x="440" y="105" width="14" height="14" rx="2" class="s-cur"/><rect x="460" y="105" width="14" height="14" rx="2" class="s-cur"/><rect x="480" y="105" width="14" height="14" rx="2" class="s-cur"/><rect x="500" y="105" width="14" height="14" rx="2" class="s-cur"/><rect x="520" y="105" width="14" height="14" rx="2" class="s-cur"/></g>
+      <rect class="s-box" x="185" y="138" width="370" height="36" rx="6"/>
+      <text class="s-t" x="197" y="161">B · w 1 · 0.30M → 0.30M</text>
+      <g class="gpu"><rect x="440" y="149" width="14" height="14" rx="2" class="s-cur"/></g>
+      <rect x="185" y="182" width="370" height="36" rx="6" style="fill:var(--gpu-wash);stroke:var(--gpu);stroke-width:1.5"/>
+      <text class="s-t" x="197" y="205">C · w 8 · 2.10M → 0.26M</text>
+      <g class="gpu"><rect x="440" y="193" width="14" height="14" rx="2" class="s-cur"/><rect x="460" y="193" width="14" height="14" rx="2" class="s-cur"/></g>
+      <text class="s-ts" x="197" y="240">tenant · weight · tokens served → per unit weight</text>
+      <text class="s-t" x="197" y="270" style="fill:var(--gpu)">pick the lowest per-weight counter → C</text>
+
+      <g class="edge">
+        <line class="s-flow" x1="120" y1="168" x2="167" y2="168" marker-end="url(#ah-edge)"/>
+        <rect class="s-card" x="590" y="104" width="180" height="124" rx="10"/>
+        <line class="s-flow" x1="570" y1="166" x2="587" y2="166" marker-end="url(#ah-edge)"/>
+        <line class="s-flow" x1="770" y1="166" x2="797" y2="166" marker-end="url(#ah-edge)"/>
+      </g>
+      <text class="s-tb s-tm" x="680" y="128" style="fill:var(--edge)">capacity gate</text>
+      <text class="s-ts s-tm" x="680" y="152">engine waiting ≤ 1</text>
+      <text class="s-ts s-tm" x="680" y="172">KV headroom ≥ need</text>
+      <text class="s-ts s-tm" x="680" y="192">tenant within share</text>
+      <text class="s-ts s-tm" x="680" y="212">or aged past limit</text>
+
+      <g class="gpu">
+        <rect class="s-card" x="800" y="62" width="165" height="236" rx="10"/>
+        <path class="s-dash" d="M800,244 C 760,244 730,244 720,231" marker-end="url(#ah-gpu)"/>
+        <line class="s-dash" x1="798" y1="282" x2="574" y2="282" marker-end="url(#ah-gpu)"/>
+      </g>
+      <text class="s-tb s-tm" x="882" y="92" style="fill:var(--gpu)">vLLM</text>
+      <text class="s-ts s-tm" x="882" y="116">waiting ≈ 0</text>
+      <text class="s-ts s-tm" x="882" y="136">continuous batch</text>
+      <text class="s-ts s-tm" x="882" y="156">chunked prefill</text>
+      <text class="s-ts s-tm" x="882" y="176">priority = class</text>
+      <text class="s-ts" x="596" y="262">engine state · every 20 ms</text>
+      <text class="s-ts" x="584" y="302">tokens streamed → counters, KV held</text>
+    </svg>
+    <figcaption>The sidecar holds <b>one queue per tenant</b> and a heap of waiting tenants ordered by counter ÷ weight. The <b>gate</b> releases work only while the engine has almost nothing queued of its own and enough free KV blocks — so the engine’s scheduler never has a backlog to reorder, and the sidecar’s order is the order that runs.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>What a tenant is charged for</h3>
+    <p>The counter measures service in weighted tokens, charged as it is consumed rather than when a request finishes, so a tenant with long streams can’t run ahead unnoticed. The weights say what each kind of token costs the replica.</p>
+  </div>
+  <pre class="code"><span class="c"># added to counter[t] as the work happens</span>
+at submission:   W_IN × (prompt_tokens − cached_tokens)  +  W_CACHED × cached_tokens
+per streamed token:   W_OUT                              <span class="c"># from the stream the sidecar proxies</span>
+
+W_IN = 1        <span class="c"># prefill: compute-heavy, brief</span>
+W_CACHED = 0.1  <span class="c"># a prefix hit costs memory, not compute</span>
+W_OUT = 2       <span class="c"># decode: holds KV for the whole stream; tune from measured GPU-seconds per token</span></pre>
+
+  <pre class="code"><span class="c"># admission queue · one per replica · runs on arrival, on completion, and every 20 ms</span>
+state
+  q[t]         FIFO of waiting requests for tenant t
+  counter[t]   weighted tokens served to t on this replica
+  kv[t]        KV blocks held by t’s running requests    <span class="c"># own accounting, reconciled with engine metrics</span>
+  heap         waiting tenants, keyed by counter[t] / weight[t]
+
+on_arrival(r):
+  t = r.tenant
+  if len(q[t]) ≥ MAX_QUEUE: return 429 replica_busy    <span class="c"># gateway retries elsewhere, before first byte</span>
+  if t has nothing waiting or running:
+      counter[t] = max(counter[t], min(counter[u] for u in heap))   <span class="c"># idle time can’t be banked</span>
+  q[t].push(r); heap.update(t); dispatch()
+
+dispatch():
+  for t in heap.ascending():                           <span class="c"># lowest counter per weight first</span>
+      if engine.waiting &gt; 1: break                     <span class="c"># the engine already has work queued</span>
+      r = aged_head() or q[t].head                      <span class="c"># aging bounds tail wait (below)</span>
+      need = blocks(r.uncached_prompt + OUT_HEADROOM)
+      if kv_free() − need &lt; KV_RESERVE: break
+      if others_waiting(t) and kv[t] + need &gt; fair_share(t) and not r.aged: continue
+      submit(r, priority = CLASS_PRIORITY[r.class])     <span class="c"># vLLM: lower value runs first, preempted last</span>
+      q[t].pop(); kv[t] += need; charge_prompt(t, r); heap.update(t)
+
+fair_share(t) = KV_TOTAL × weight[t] / Σ weight[u]     <span class="c"># over tenants running or waiting here</span></pre>
+
+  <div class="sub">
+    <h3>Requests bigger than a fair share</h3>
+    <p>A 128k-token prompt can need more KV than its tenant’s share even with nothing else running (<a href="#s11">11</a>). Skipping it forever would starve it; admitting it immediately would evict everyone. Instead it <em>ages</em>: after <code>AGE_MAX</code> it is marked, the gate stops admitting new work from anyone until enough blocks free up, and then it goes in. Streams already running are untouched — the only cost is a pause in <em>new</em> admissions, bounded by how long current sequences take to finish. The same aging applies to any request at the head of a queue, which turns the counter’s fairness into a bounded tail wait per class.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Fair per replica, bounded per pool</h3>
+    <p>Counters are local to each replica. That is deliberately not global fairness: a heavy tenant spread over every replica gets its fair share on each, and a tenant concentrated by prefix affinity (<a href="#s10">10</a>) looks heavy exactly where it is. The pool-wide ceiling comes from the gateway limits (<a href="#s09">09</a>). Sharing counters across replicas would put a network round-trip back into the scheduler for a small gain.</p>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Starting value</th><th>What it trades</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">weights</td><td class="num">free 1 · standard 4 · enterprise 8</td><td>Share of a contended replica; batch class multiplies by 0.25</td></tr>
+        <tr><td class="nm">CLASS_PRIORITY</td><td class="num">interactive 0 · batch 10</td><td>Order and preemption inside vLLM (<code>--scheduling-policy priority</code>)</td></tr>
+        <tr><td class="nm">MAX_QUEUE</td><td class="num">64 per tenant per replica</td><td>Memory and wait vs. early 429s the gateway can retry elsewhere</td></tr>
+        <tr><td class="nm">KV_RESERVE</td><td class="num">8% of blocks</td><td>Headroom for growing sequences vs. batch size; keeps engine preemption rare</td></tr>
+        <tr><td class="nm">OUT_HEADROOM</td><td class="num">256 tokens</td><td>Blocks set aside for a new sequence’s first output</td></tr>
+        <tr><td class="nm">AGE_MAX</td><td class="num">interactive 10 s · batch 120 s</td><td>Tail wait guarantee vs. fairness purity</td></tr>
+        <tr><td class="nm">engine flags</td><td class="num">chunked prefill · 8,192 tokens/step · prefix caching</td><td>Per-step budget: one long prompt vs. everyone’s inter-token latency</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub">
+    <h3>How you know it works</h3>
+    <p>Each of these runs as a load test against a single replica, compared with the same light traffic running alone.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>Passes when</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">one heavy, many light</td><td>100 concurrent 8k-token requests from one tenant, 50 light tenants at 1 req/s: light tenants’ p95 time to first token within 1.2× of their solo baseline</td></tr>
+        <tr><td class="nm">newcomer burst</td><td>A tenant idle for an hour sends 500 requests at once: it gets no more than its weight’s share while others are waiting</td></tr>
+        <tr><td class="nm">one huge prompt</td><td>A 128k-token request arrives on a busy replica: admitted within <code>AGE_MAX</code>; others’ inter-token p99 rises by less than 20%</td></tr>
+        <tr><td class="nm">alone on the replica</td><td>A single tenant with no competition uses the whole KV cache — the caps are work-conserving</td></tr>
+        <tr><td class="nm">batch flood</td><td>Batch traffic at 10× capacity plus normal interactive: interactive latency unchanged, batch fills every idle slot</td></tr>
+        <tr><td class="nm">weights hold</td><td>Two saturating tenants at weights 4 and 1: served tokens converge to 4 : 1 within a minute</td></tr>
+      </tbody>
+    </table>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s12"><span>Previous</span>12 — Three layers of isolation</a>
+        <a class="seq-next" href="#s14"><span>Next</span>14 — What to scale on</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="7">
+  <div class="part-n">Component 6 of 7</div>
+  <div class="part-t">Autoscaler</div>
+  <p class="part-d">One control loop per model pool, scaling on queue wait and KV use, against a cold start measured in minutes.</p>
+</div>
+
+<section id="s14">
+  <details open>
+    <summary>
+      <div class="eyebrow">14 — What to scale on</div>
       <h2>Not CPU, and not requests per second</h2>
       <p class="q">Which signal says a pool needs another replica?</p>
     </summary>
@@ -1345,7 +1922,7 @@ send to argmin(score(a), score(b))</pre>
       <tbody>
         <tr><td class="nm">GPU utilisation</td><td><span class="pill trustp">misleading</span></td><td>Near 100% whenever anything at all is running. It can’t tell a comfortable replica from a drowning one.</td></tr>
         <tr><td class="nm">requests per second</td><td><span class="pill trustp">misleading</span></td><td>A request can be 50 tokens or 100k. The same RPS can be idle or saturated depending on the mix.</td></tr>
-        <tr><td class="nm">queue wait p95</td><td><span class="pill gpup">primary</span></td><td>The part of time to first token that capacity controls (<a href="#s03">03</a>). Directly tied to the SLO.</td></tr>
+        <tr><td class="nm">queue wait p95</td><td><span class="pill gpup">primary</span></td><td>The part of time to first token that capacity controls (<a href="#s02">02</a>). Directly tied to the SLO.</td></tr>
         <tr><td class="nm">KV cache use</td><td><span class="pill gpup">leading</span></td><td>Rises before queue wait does; above ~90% the engine starts preempting and latency jumps.</td></tr>
         <tr><td class="nm">tokens/s vs benchmarked capacity</td><td><span class="pill ctlp">planning</span></td><td>Good for forecasting and for the floor; too slow-moving to react with.</td></tr>
       </tbody>
@@ -1355,7 +1932,7 @@ send to argmin(score(a), score(b))</pre>
   <pre class="code"><span class="c"># per model pool · evaluated every 15 s by the capacity controller</span>
 pool: llama-3.3-70b
 replica_shape: { gpus: 2, type: H100-80G, tp: 2 }
-min_replicas: 2                     <span class="c"># one per zone, never zero (12)</span>
+min_replicas: 2                     <span class="c"># one per zone, never zero (16)</span>
 max_replicas: 60
 scale_up:
   when:  queue_wait_p95 &gt; 200ms  or  kv_used_p90 &gt; 0.85      <span class="c"># either one</span>
@@ -1369,7 +1946,7 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
 
   <div class="sub">
     <h3>Why up is fast and down is slow</h3>
-    <p>Adding a replica costs money for a few minutes. Removing one too early costs a cold start — minutes of degraded latency — the next time traffic rises (<a href="#s11">11</a>). The asymmetry follows directly: scale up on the first sign of trouble by a fraction of the pool, scale down one replica at a time after ten quiet minutes, and drain rather than kill so streams aren’t cut.</p>
+    <p>Adding a replica costs money for a few minutes. Removing one too early costs a cold start — minutes of degraded latency — the next time traffic rises (<a href="#s15">15</a>). The asymmetry follows directly: scale up on the first sign of trouble by a fraction of the pool, scale down one replica at a time after ten quiet minutes, and drain rather than kill so streams aren’t cut.</p>
   </div>
 
   <div class="sub">
@@ -1377,17 +1954,17 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
     <p>Demand can outrun even a fast autoscaler. Rather than let queue wait grow for everyone, admission sheds load in order: batch-class traffic first, then free tier, then paid tiers above their committed rate. Shed requests get a <code>429</code> with a <code>Retry-After</code> computed from the pool’s current queue estimate, so well-behaved clients back off by the right amount instead of retrying into the storm.</p>
   </div>
       <nav class="seq">
-        <a class="seq-prev" href="#s09"><span>Previous</span>09 — Choosing a replica</a>
-        <a class="seq-next" href="#s11"><span>Next</span>11 — Cold start</a>
+        <a class="seq-prev" href="#s13"><span>Previous</span>13 — The fair-queue scheduler</a>
+        <a class="seq-next" href="#s15"><span>Next</span>15 — Cold start</a>
       </nav>
     </div>
   </details>
 </section>
 
-<section id="s11">
+<section id="s15">
   <details open>
     <summary>
-      <div class="eyebrow">11 — Cold start</div>
+      <div class="eyebrow">15 — Cold start</div>
       <h2>A replica takes minutes to exist</h2>
       <p class="q">Why can’t inference scale like a web tier?</p>
     </summary>
@@ -1434,17 +2011,23 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
     <div class="rung"><span class="n">4</span><div><h3>Scale on the forecast, not the alarm</h3><p>Traffic is strongly daily and weekly. A floor from last week’s same hour means the morning ramp is met by replicas that started ten minutes early, not by an alarm that fires at the peak.</p></div></div>
   </div>
       <nav class="seq">
-        <a class="seq-prev" href="#s10"><span>Previous</span>10 — What to scale on</a>
-        <a class="seq-next" href="#s12"><span>Next</span>12 — Ten models, one fleet</a>
+        <a class="seq-prev" href="#s14"><span>Previous</span>14 — What to scale on</a>
+        <a class="seq-next" href="#s16"><span>Next</span>16 — Ten models, one fleet</a>
       </nav>
     </div>
   </details>
 </section>
 
-<section id="s12">
+<div class="part" data-part="8">
+  <div class="part-n">Component 7 of 7</div>
+  <div class="part-t">Fleet arbiter</div>
+  <p class="part-d">Above the pool autoscalers: one budget of GPUs, and ten pools that each want more of it.</p>
+</div>
+
+<section id="s16">
   <details open>
     <summary>
-      <div class="eyebrow">12 — Ten models, one fleet</div>
+      <div class="eyebrow">16 — Ten models, one fleet</div>
       <h2>Ten pools that share one set of GPUs</h2>
       <p class="q">How do ten models divide a fixed number of GPUs?</p>
     </summary>
@@ -1478,63 +2061,10 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
 
   <div class="sub">
     <h3>The long tail</h3>
-    <p>Quiet models are the expensive part of a catalog: two replicas of a model that sees ten requests a minute cost as much as two replicas that are full. Options, in order of preference: keep one awake replica and a second <em>asleep</em> on a node shared with a busier model (<a href="#s11">11</a>); consolidate quiet 1-GPU models onto fewer nodes; and, if a model stays quiet for a quarter, take it out of the catalog. Scale-to-zero is deliberately not on the list — a first request that waits minutes is not a service anyone would pay for.</p>
+    <p>Quiet models are the expensive part of a catalog: two replicas of a model that sees ten requests a minute cost as much as two replicas that are full. Options, in order of preference: keep one awake replica and a second <em>asleep</em> on a node shared with a busier model (<a href="#s15">15</a>); consolidate quiet 1-GPU models onto fewer nodes; and, if a model stays quiet for a quarter, take it out of the catalog. Scale-to-zero is deliberately not on the list — a first request that waits minutes is not a service anyone would pay for.</p>
   </div>
       <nav class="seq">
-        <a class="seq-prev" href="#s11"><span>Previous</span>11 — Cold start</a>
-        <a class="seq-next" href="#s13"><span>Next</span>13 — A region, sized</a>
-      </nav>
-    </div>
-  </details>
-</section>
-
-<div class="part" data-part="5">
-  <div class="part-n">Part V</div>
-  <div class="part-t">A region, end to end</div>
-  <p class="part-d">Every part so far argued for a mechanism. This one puts numbers on all of them at once, for one region at a plausible peak — so the sizes can be checked against each other, and against your own benchmarks.</p>
-</div>
-
-<section id="s13">
-  <details open>
-    <summary>
-      <div class="eyebrow">13 — A region, sized</div>
-      <h2>Fifteen hundred requests a second, costed</h2>
-      <p class="q">What does the whole thing look like at a real number?</p>
-    </summary>
-    <div class="sec-body">
-      <p class="lede">A single region across three availability zones, at a peak of 1,500 new requests a second, with an average prompt of 1,500 tokens, an average answer of 350, and an average stream lasting 12 seconds.</p>
-
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>Model class</th><th>Share</th><th>Req/s</th><th>Output tok/s</th><th>Per replica*</th><th>Replicas</th><th>GPUs</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">8B · 7B</td><td class="num">35%</td><td class="num">525</td><td class="num">184k</td><td class="num">8,000 · 1 GPU</td><td class="num">23</td><td class="num">23 H100</td></tr>
-        <tr><td class="nm">24B · 27B · 32B</td><td class="num">20%</td><td class="num">300</td><td class="num">105k</td><td class="num">4,000 · 1 GPU</td><td class="num">27</td><td class="num">27 H100</td></tr>
-        <tr><td class="nm">70B class · 3 models</td><td class="num">30%</td><td class="num">450</td><td class="num">158k</td><td class="num">3,500 · TP=2</td><td class="num">45</td><td class="num">90 H100</td></tr>
-        <tr><td class="nm">Mixtral 8×22B</td><td class="num">5%</td><td class="num">75</td><td class="num">26k</td><td class="num">4,000 · TP=4</td><td class="num">7</td><td class="num">28 H100</td></tr>
-        <tr><td class="nm">DeepSeek-V3</td><td class="num">10%</td><td class="num">150</td><td class="num">53k</td><td class="num">6,000 · TP=8</td><td class="num">9</td><td class="num">72 H200</td></tr>
-      </tbody>
-      <tfoot><tr><td class="nm">at peak</td><td class="num">100%</td><td class="num">1,500</td><td class="num">525k</td><td></td><td class="num">111</td><td class="num">168 H100 · 72 H200</td></tr></tfoot>
-    </table>
-  </div>
-  <p class="body">* Output tokens per second per replica at this prompt/answer mix while meeting the latency SLO — <em>an assumption to be replaced by your own benchmark</em>, not a vendor number. With 25% headroom for losing a zone and for scale-up lag, the fleet at peak is about <em>27 H100 nodes and 12 H200 nodes</em>; off-peak the autoscaler hands most of that back to the arbiter, down to the floor in <a href="#s12">12</a>.</p>
-
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>Component</th><th>Size at peak</th><th>Load it carries</th><th>Scales on</th></tr></thead>
-      <tbody>
-        <tr><td class="nm">gateway</td><td>12 pods × 4 vCPU, 4 per zone</td><td>18,000 concurrent streams (1,500 × 12 s); ≤ 2,500 each, so a zone can be lost</td><td>concurrent streams</td></tr>
-        <tr><td class="nm">key service</td><td>3 pods + Postgres</td><td>cache misses only — tens per second; revocations are rare</td><td>—</td></tr>
-        <tr><td class="nm">revocation bus</td><td>3 nodes</td><td>fan-out to 12 subscribers</td><td>—</td></tr>
-        <tr><td class="nm">limit service</td><td>3 nodes, 1 per zone</td><td>share rebalancing: roughly active tenants × gateways per second</td><td>active tenants</td></tr>
-        <tr><td class="nm">engines</td><td>111 replicas, 240 GPUs</td><td>2.25M input + 525k output tokens/s</td><td>queue wait · KV use</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="note"><b>What the sizes say.</b> Everything except the engines is small — a few dozen CPU pods and one small database guarding roughly 240 GPUs. That ratio is the argument for the design’s shape: spend CPU freely at the edge to keep a GPU from doing a single token of work it shouldn’t, whether that token is unauthorised, abandoned, or crowding out another tenant.</div>
-      <nav class="seq">
-        <a class="seq-prev" href="#s12"><span>Previous</span>12 — Ten models, one fleet</a>
+        <a class="seq-prev" href="#s15"><span>Previous</span>15 — Cold start</a>
         <a class="seq-next" href="#coda"><span>Next</span>Coda — Bound it, spend it locally</a>
       </nav>
     </div>
@@ -1558,7 +2088,7 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
         <tr><td class="nm">local budget</td><td>per-gateway bucket share</td><td>cached key entry</td><td>per-tenant block share</td><td>pool min / max</td></tr>
         <tr><td class="nm">refreshed</td><td class="num">~1 s</td><td class="num">push · TTL 60 s</td><td class="num">every step</td><td class="num">15 s · drain in minutes</td></tr>
         <tr><td class="nm">worst case</td><td>one bucket share per gateway</td><td>60 s on a partitioned gateway</td><td>one preemption</td><td>queue wait until a warm replica lands</td></tr>
-        <tr><td class="nm">section</td><td class="num"><a href="#s08">08</a></td><td class="num"><a href="#s05">05</a></td><td class="num"><a href="#s08">08</a></td><td class="num"><a href="#s10">10</a> <a href="#s12">12</a></td></tr>
+        <tr><td class="nm">section</td><td class="num"><a href="#s09">09</a></td><td class="num"><a href="#s07">07</a></td><td class="num"><a href="#s12">12</a> <a href="#s13">13</a></td><td class="num"><a href="#s14">14</a> <a href="#s16">16</a></td></tr>
       </tbody>
     </table>
   </div>
@@ -1566,7 +2096,7 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
   <p class="lede">Every guarantee in this design has the same shape. A central authority holds the truth, hands out a <em>bounded</em> piece of it to whoever is on the hot path, and takes it back on a timer. The hot path never waits for the authority; the authority never lets the pieces add up to more than it can afford to lose.</p>
   <p class="body">It is the same move four times — for rate, for trust, for memory and for capacity — and the design question each time is the same pair: <em>how big is the piece</em>, and <em>what is the worst it can cost</em> if the holder vanishes with it. Choose those two numbers deliberately and write them down, and a shared, public inference service stops being a set of competing concerns and becomes one mechanism applied carefully.</p>
       <nav class="seq">
-        <a class="seq-prev" href="#s13"><span>Previous</span>13 — A region, sized</a>
+        <a class="seq-prev" href="#s16"><span>Previous</span>16 — Ten models, one fleet</a>
         <a class="seq-next" href="#glossary"><span>Next</span>Glossary</a>
       </nav>
     </div>
@@ -1604,6 +2134,9 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
         <div><dt>Virtual Token Counter</dt><dd>A fair scheduler that tracks tokens served per tenant and gives the next batch slot to the waiting tenant with the lowest count.</dd></div>
         <div><dt>work-conserving</dt><dd>A limit that applies only when someone else is waiting, so an idle resource is never held back.</dd></div>
       </dl>
+      <nav class="seq">
+        <a class="seq-prev" href="#coda"><span>Previous</span>Coda — Bound it, spend it locally</a>
+      </nav>
     </div>
   </details>
 </section>
@@ -1632,7 +2165,7 @@ floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"
     var a = rail.querySelector('a[href="#' + sec.id + '"]');
     if (a) links[sec.id] = a;
   });
-  var PART_OF = {"s00": 0, "s01": 1, "s02": 1, "s03": 1, "s04": 2, "s05": 2, "s06": 2, "s07": 3, "s08": 3, "s09": 3, "s10": 4, "s11": 4, "s12": 4, "s13": 5, "coda": 6, "glossary": 6};
+  var PART_OF = {"s00": 0, "coda": 9, "glossary": 9, "s01": 1, "s02": 1, "s03": 1, "s04": 2, "s05": 2, "s06": 3, "s07": 3, "s08": 3, "s09": 4, "s10": 5, "s11": 6, "s12": 6, "s13": 6, "s14": 7, "s15": 7, "s16": 8};
   var activePart = -1, showAll = false;
   var dividers = [].slice.call(document.querySelectorAll('.part[data-part]'));
   var allBtn = document.getElementById('showAll');

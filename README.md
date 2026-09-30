@@ -15,13 +15,18 @@ Every diagram is hand-authored inline SVG. The only external request is to Googl
 
 **Origins** — who built each piece of the serving stack, when, and what problem they actually had.
 
-| Part | Sections |
+Organised by component, in the order a request meets them — one pill per component.
+
+| Component | Sections |
 | --- | --- |
-| **I · The request path** | 01 The shape of it · 02 The gateway holds on · 03 The latency budget |
-| **II · The key is the perimeter** | 04 Anatomy of a key · 05 Verifying every request · 06 When a key leaks |
-| **III · Sharing a GPU fairly** | 07 Inside one replica · 08 Three layers of isolation · 09 Choosing a replica |
-| **IV · Capacity that follows demand** | 10 What to scale on · 11 Cold start · 12 Ten models, one fleet |
-| **V · A region, end to end** | 13 A region, sized — 1,500 req/s, 18,000 concurrent streams, ~240 GPUs |
+| **Overview** | 01 The shape of it · 02 The latency budget · 03 A region, sized — 1,500 req/s, 18,000 streams, ~240 GPUs |
+| **Gateway** | 04 The gateway holds on · 05 Inside the gateway — tables, stream lifecycle, backpressure, retries, catalog, metrics |
+| **Key service** | 06 Anatomy of a key · 07 Verifying every request · 08 When a key leaks |
+| **Limit service** | 09 One limit, many gateways — demand-weighted shares and their failure bounds |
+| **Router** | 10 Choosing a replica |
+| **Engine** | 11 Inside one replica · 12 Three layers of isolation · 13 The fair-queue scheduler — admission queue, cost model, parameters, tests |
+| **Autoscaler** | 14 What to scale on · 15 Cold start |
+| **Fleet arbiter** | 16 Ten models, one fleet |
 | **Coda** | Bound it, then spend it locally |
 
 The through-line: every guarantee is a central authority handing a *bounded* piece of
@@ -33,8 +38,8 @@ worst it can cost if the holder vanishes with it.
 
 ## Where to start
 
-The page opens with four reading paths — you're building the API, you run the GPUs,
-you own the platform, or the whole thing top to bottom. Every section also carries the
+The page opens with a table of the seven components and four reading paths — you're
+building the API, you run the GPUs, you own the platform, or the whole thing top to bottom. Every section also carries the
 question it answers, so a collapsed page reads as an index you can scan.
 
 ## Reading it locally
