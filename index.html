@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keys, Queues and Caches</title>
+<meta name="description" content="A design guide for a multi-tenant, regional LLM inference service: the request path, API keys as the perimeter, sharing a GPU fairly, and autoscaling ten models on one fleet.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#E8EBF0">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0D1117">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Keys, Queues and Caches">
+<meta property="og:description" content="A design guide for a multi-tenant, regional LLM inference service: the request path, API keys as the perimeter, sharing a GPU fairly, and autoscaling ten models on one fleet.">
+<meta property="og:url" content="https://dharmjit.github.io/ai-inference-learnings/">
+<meta name="twitter:card" content="summary">
+<link rel="canonical" href="https://dharmjit.github.io/ai-inference-learnings/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+:root{color-scheme:light dark}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:#E8EBF0;
+  --surface:#FFFFFF;
+  --sunk:#DFE3EA;
+  --ink:#151B25;
+  --ink-soft:#5A6678;
+  --rule:#C7CEDB;
+  --money:#A25E05;
+  --money-wash:#F7E9D2;
+  --edge:#1A5AA3;
+  --edge-wash:#DDE7F5;
+  --trust:#8A2A66;
+  --trust-wash:#F3DDEC;
+  --gpu:#0E6B62;
+  --gpu-wash:#D6EBE7;
+  --ctl:#4B3BB8;
+  --ctl-wash:#E2DEF7;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --sans:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --shadow:0 1px 0 rgba(21,27,37,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1117;
+    --surface:#161C25;
+    --sunk:#111720;
+    --ink:#E3E8F0;
+    --ink-soft:#94A1B4;
+    --rule:#28313E;
+    --money:#E0A33F;
+    --money-wash:#38290F;
+    --edge:#6FA6E4;
+    --edge-wash:#13243A;
+    --trust:#DC85BC;
+    --trust-wash:#331327;
+    --gpu:#4FC2B2;
+    --gpu-wash:#0C2B28;
+    --ctl:#A79AF5;
+    --ctl-wash:#1E1A3D;
+    --shadow:0 1px 0 rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1117;
+  --surface:#161C25;
+  --sunk:#111720;
+  --ink:#E3E8F0;
+  --ink-soft:#94A1B4;
+  --rule:#28313E;
+  --money:#E0A33F;
+  --money-wash:#38290F;
+  --edge:#6FA6E4;
+  --edge-wash:#13243A;
+  --trust:#DC85BC;
+  --trust-wash:#331327;
+  --gpu:#4FC2B2;
+  --gpu-wash:#0C2B28;
+  --ctl:#A79AF5;
+  --ctl-wash:#1E1A3D;
+  --shadow:0 1px 0 rgba(0,0,0,.4);
+}
+
+body{padding-top:56px;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16.5px;line-height:1.62;}
+.wrap{max-width:1060px;margin:0 auto;padding:56px 22px 90px;}
+
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(2.1rem,5.4vw,3.4rem);line-height:1.04;letter-spacing:-.035em;margin:.15em 0 0;text-wrap:balance;}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(1.35rem,3vw,1.85rem);line-height:1.15;letter-spacing:-.03em;margin:0;text-wrap:balance;}
+h3{font-family:var(--mono);font-weight:600;font-size:1.02rem;letter-spacing:-.02em;margin:0;}
+p{margin:0;}
+.eyebrow{font-family:var(--mono);font-size:.72rem;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);}
+.lede{font-size:clamp(1.05rem,2vw,1.22rem);color:var(--ink-soft);max-width:62ch;}
+.body{max-width:66ch;}
+.body + .body{margin-top:.85em;}
+em{color:var(--ink);font-style:normal;font-weight:600;}
+code{font-family:var(--mono);font-size:.9em;background:var(--sunk);padding:.12em .38em;border-radius:4px;}
+
+header.hero{display:flex;flex-direction:column;gap:16px;padding-bottom:38px;}
+.key{display:flex;flex-wrap:wrap;gap:10px 22px;padding-top:6px;}
+.key span{font-family:var(--mono);font-size:.78rem;display:flex;align-items:center;gap:8px;color:var(--ink-soft);}
+.key i{width:13px;height:13px;border-radius:3px;display:block;}
+
+section{display:block;padding:46px 0;border-top:1px solid var(--rule);}
+section > details{display:block;}
+section > details > summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:9px;position:relative;padding-right:46px;}
+section > details > summary::-webkit-details-marker{display:none;}
+section > details > summary::after{content:"";position:absolute;right:10px;top:50%;width:10px;height:10px;border-right:1.5px solid var(--ink-soft);border-bottom:1.5px solid var(--ink-soft);transform:translateY(-75%) rotate(45deg);transition:transform .18s ease,border-color .18s ease;}
+section > details[open] > summary::after{transform:translateY(-25%) rotate(-135deg);}
+section > details > summary:hover::after{border-color:var(--ink);}
+section > details > summary:focus-visible{outline:2px solid var(--ink);outline-offset:6px;border-radius:4px;}
+.sec-body{display:flex;flex-direction:column;gap:22px;padding-top:9px;}
+.sub{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--rule);padding-top:22px;margin-top:8px;}
+.sub h3{font-family:var(--mono);font-weight:600;font-size:1.15rem;letter-spacing:-.025em;}
+.sub p{font-size:1rem;line-height:1.55;color:var(--ink-soft);max-width:64ch;}
+.walk{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px 28px;margin-top:4px;padding-top:16px;border-top:1px solid var(--rule);}
+.walk > div{display:flex;gap:11px;font-size:.9rem;line-height:1.45;}
+.walk b{font-family:var(--mono);font-size:.8rem;color:var(--edge);flex:none;padding-top:1px;}
+.walk em{font-style:normal;font-weight:600;color:var(--ink);}
+.q{font-size:.95rem;line-height:1.4;color:var(--ink-soft);max-width:62ch;}
+.paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px 26px;border-top:1px solid var(--rule);padding-top:22px;margin-top:18px;}
+.path{display:flex;flex-direction:column;gap:6px;}
+.path b{font-family:var(--mono);font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;font-weight:500;color:var(--ink-soft);}
+.path span{font-size:.92rem;line-height:1.45;}
+.hops{font-family:var(--mono);font-size:.82rem;display:flex;flex-wrap:wrap;gap:8px;}
+.hops a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule);}
+.hops a:hover{border-bottom-color:var(--ink);}
+.seq{display:flex;justify-content:space-between;gap:24px;border-top:1px solid var(--rule);padding-top:18px;margin-top:6px;}
+.seq a{display:flex;flex-direction:column;gap:3px;text-decoration:none;color:var(--ink);font-size:.92rem;max-width:47%;}
+.seq a span{font-family:var(--mono);font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);}
+.seq a:hover span{color:var(--ink);}
+.seq-next{margin-left:auto;text-align:right;align-items:flex-end;}
+.g{border-bottom:1px dotted var(--ink-soft);cursor:help;position:relative;font-style:normal;}
+.g::after{content:attr(data-def);position:absolute;left:50%;bottom:calc(100% + 11px);transform:translateX(-50%);width:290px;padding:11px 14px;background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:.8rem;font-weight:400;line-height:1.45;text-align:left;border-radius:8px;opacity:0;visibility:hidden;transition:opacity .14s ease;z-index:30;pointer-events:none;}
+.g::before{content:"";position:absolute;left:50%;bottom:calc(100% + 5px);transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--ink);opacity:0;visibility:hidden;transition:opacity .14s ease;z-index:30;pointer-events:none;}
+.g:hover::after,.g:hover::before,.g:focus-visible::after,.g:focus-visible::before{opacity:1;visibility:visible;}
+.g:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px;}
+.gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px 32px;margin:0;}
+.gloss > div{display:flex;flex-direction:column;gap:4px;}
+.gloss dt{font-family:var(--mono);font-weight:500;font-size:.92rem;}
+.gloss dd{margin:0;font-size:.92rem;line-height:1.5;color:var(--ink-soft);}
+.demo{display:flex;flex-direction:column;gap:16px;}
+.demo-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;}
+.demo-btn{font-family:var(--mono);font-size:.82rem;font-weight:500;background:var(--ink);color:var(--paper);border:0;border-radius:999px;padding:10px 20px;cursor:pointer;}
+.demo-btn:hover{opacity:.86;}
+.demo-btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+.demo-btn.ghost{background:none;color:var(--ink-soft);border:1px solid var(--rule);}
+.demo-btn.ghost:hover{color:var(--ink);opacity:1;}
+.demo-btn[disabled]{opacity:.45;cursor:default;}
+.demo-round{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+.meter{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;}
+.meter .k{font-family:var(--mono);font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft);}
+.meter .v{font-family:var(--mono);font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;}
+.foldall{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;color:var(--ink-soft);background:none;border:1px solid var(--rule);border-radius:999px;padding:7px 15px;cursor:pointer;align-self:flex-start;}
+.foldall:hover{color:var(--ink);border-color:var(--ink-soft);}
+.foldall:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+.rail .foldall{width:100%;margin-top:4px;}
+
+figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:20px 18px 16px;box-shadow:var(--shadow);overflow-x:auto;}
+figure svg{display:block;width:100%;height:auto;min-width:820px;}
+figure.wide svg{min-width:980px;}
+figcaption{font-family:var(--mono);font-size:.8rem;line-height:1.5;color:var(--ink-soft);margin-top:14px;max-width:78ch;}
+figcaption b{color:var(--ink);font-weight:500;}
+
+/* svg primitives */
+.s-box{fill:var(--surface);stroke:var(--rule);stroke-width:1.5;}
+.s-zone{fill:var(--sunk);stroke:var(--rule);stroke-width:1.5;}
+.s-node{fill:var(--surface);stroke:currentColor;stroke-width:2;}
+.s-card{fill:var(--surface);stroke:currentColor;stroke-width:1.6;}
+.s-link{stroke:currentColor;stroke-width:1.6;fill:none;opacity:.5;}
+.s-flow{stroke:currentColor;stroke-width:2.2;fill:none;}
+.s-dash{stroke:currentColor;stroke-width:1.6;fill:none;stroke-dasharray:5 4;}
+.s-t{font-family:var(--mono);font-size:13px;fill:var(--ink);}
+.s-tb{font-family:var(--mono);font-size:13px;font-weight:600;fill:var(--ink);}
+.s-ts{font-family:var(--mono);font-size:11.5px;fill:var(--ink-soft);}
+.s-tm{text-anchor:middle;}
+.s-te{text-anchor:end;}
+.s-cur{fill:currentColor;}
+.money{color:var(--money);}
+.edge{color:var(--edge);}
+.trust{color:var(--trust);}
+.gpu{color:var(--gpu);}
+.ctl{color:var(--ctl);}
+.inkc{color:var(--ink-soft);}
+.f-money{fill:var(--money);}.f-edge{fill:var(--edge);}.f-trust{fill:var(--trust);}.f-gpu{fill:var(--gpu);}.f-ctl{fill:var(--ctl);}
+.w-money{fill:var(--money-wash);}.w-edge{fill:var(--edge-wash);}.w-trust{fill:var(--trust-wash);}.w-gpu{fill:var(--gpu-wash);}.w-ctl{fill:var(--ctl-wash);}
+
+/* two-up */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:20px 20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;}
+.card .tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;font-weight:500;}
+.card ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:7px;}
+.card li{font-size:.96rem;}
+.card li b{font-weight:600;}
+.card p{font-size:.96rem;color:var(--ink-soft);}
+.card.moneyc{border-top:4px solid var(--money);}
+.card.edgec{border-top:4px solid var(--edge);}
+.card.trustc{border-top:4px solid var(--trust);}
+.card.gpuc{border-top:4px solid var(--gpu);}
+.card.ctlc{border-top:4px solid var(--ctl);}
+.card.inkc2{border-top:4px solid var(--ink-soft);}
+
+/* tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+table{width:100%;border-collapse:collapse;font-size:.9rem;min-width:680px;}
+th{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--ink-soft);text-align:left;padding:13px 16px;border-bottom:1px solid var(--rule);vertical-align:bottom;}
+td{padding:13px 16px;border-bottom:1px solid var(--rule);vertical-align:top;}
+tbody tr:last-child td{border-bottom:0;}
+tfoot td{border-top:1px solid var(--rule);border-bottom:0;font-weight:600;}
+td.nm{font-family:var(--mono);font-weight:500;white-space:nowrap;}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-soft);white-space:nowrap;}
+td a{color:var(--ink);}
+.pill{font-family:var(--mono);font-size:.72rem;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+.pill.moneyp{background:var(--money-wash);color:var(--money);}
+.pill.edgep{background:var(--edge-wash);color:var(--edge);}
+.pill.trustp{background:var(--trust-wash);color:var(--trust);}
+.pill.gpup{background:var(--gpu-wash);color:var(--gpu);}
+.pill.ctlp{background:var(--ctl-wash);color:var(--ctl);}
+
+/* bit field */
+.bits{display:flex;border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);}
+.bit{padding:16px 12px;text-align:center;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:5px;min-width:0;}
+.bit:last-child{border-right:0;}
+.bit b{font-family:var(--mono);font-weight:600;font-size:.95rem;overflow-wrap:anywhere;}
+.bit span{font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);letter-spacing:.08em;}
+.bit.k-pre{flex:8 1 0;background:var(--trust-wash);}
+.bit.k-id{flex:16 1 0;}
+.bit.k-sec{flex:43 1 0;background:var(--sunk);}
+.bit.k-crc{flex:7 1 0;}
+
+/* ladder */
+.ladder{display:flex;flex-direction:column;}
+.rung{display:grid;grid-template-columns:auto 1fr;gap:20px;padding:18px 2px;border-bottom:1px solid var(--rule);align-items:start;}
+.rung:first-child{border-top:1px solid var(--rule);}
+.rung .n{font-family:var(--mono);font-size:.95rem;font-weight:600;color:var(--ink-soft);padding-top:2px;}
+.rung h3{margin-bottom:4px;}
+.rung p{font-size:.96rem;color:var(--ink-soft);}
+.rung p b{color:var(--ink);font-weight:600;}
+
+/* top bar */
+.topbar{position:fixed;top:0;left:0;right:0;height:56px;display:flex;align-items:center;gap:22px;padding:0 20px;background:var(--paper);border-bottom:1px solid var(--rule);z-index:40;overflow-x:auto;}
+.brand{font-family:var(--mono);font-weight:600;font-size:.86rem;letter-spacing:-.025em;color:var(--ink);text-decoration:none;white-space:nowrap;}
+.brand em{font-style:normal;color:var(--ink-soft);}
+.parts{display:flex;border:1px solid var(--rule);border-radius:999px;overflow:hidden;background:var(--surface);flex:none;}
+.parts a{font-family:var(--mono);font-size:.72rem;padding:7px 14px;text-decoration:none;color:var(--ink-soft);border-right:1px solid var(--rule);white-space:nowrap;transition:background .15s ease,color .15s ease;}
+.parts a:last-child{border-right:0;}
+.parts a:hover{color:var(--ink);}
+.parts a.on{background:var(--ink);color:var(--paper);}
+.utils{display:flex;gap:18px;margin-left:auto;flex:none;}
+.utils a{font-family:var(--mono);font-size:.74rem;color:var(--ink-soft);text-decoration:none;white-space:nowrap;}
+.utils a:hover{color:var(--ink);}
+.utils a.on{color:var(--ink);border-bottom:1px solid var(--ink);}
+
+@media (max-width:1180px){
+  .brand{display:none;}
+}
+
+/* contents rail */
+.rail{display:none;}
+.rail-title{display:block;font-family:var(--mono);font-size:.82rem;font-weight:600;letter-spacing:-.025em;line-height:1.3;color:var(--ink);text-decoration:none;margin-bottom:24px;}
+.rail-g{margin-bottom:18px;}
+.rail-g[hidden]{display:none;}
+.rail-h{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);line-height:1.4;margin-bottom:7px;padding-left:12px;}
+.rail-g a{display:flex;gap:9px;font-size:.8rem;line-height:1.35;color:var(--ink-soft);text-decoration:none;padding:4px 0 4px 10px;border-left:2px solid transparent;}
+.rail-g a span{font-family:var(--mono);font-size:.72rem;opacity:.75;flex:none;}
+.rail-g a:hover{color:var(--ink);}
+.rail-g a.on{color:var(--ink);border-left-color:var(--ink);font-weight:500;}
+.rail-g a.on span{opacity:1;}
+@media (min-width:1180px){
+  body{padding-left:252px;}
+  .rail{display:block;position:fixed;top:56px;left:0;width:252px;height:calc(100vh - 56px);overflow-y:auto;box-sizing:border-box;padding:36px 20px 44px;border-right:1px solid var(--rule);background:var(--paper);}
+}
+
+/* parts + nav */
+.part{border-top:3px solid var(--ink);padding:38px 0 6px;display:flex;flex-direction:column;gap:11px;}
+.part-n{font-family:var(--mono);font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-soft);}
+.part-t{font-family:var(--mono);font-weight:600;font-size:clamp(1.7rem,4vw,2.35rem);letter-spacing:-.035em;line-height:1.04;}
+.part-d{font-size:1.04rem;color:var(--ink-soft);max-width:62ch;}
+.part + section{border-top:0;padding-top:28px;}
+section[id]{scroll-margin-top:72px;}
+.toc{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 30px;border-top:1px solid var(--rule);padding-top:24px;margin-top:14px;}
+.toc-h{font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:11px;}
+.toc ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;}
+.toc li{font-size:.9rem;display:flex;gap:10px;}
+.toc .no{font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);padding-top:2px;}
+.toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule);}
+.toc a:hover{border-bottom-color:var(--ink);}
+a:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:2px;}
+pre.code{margin:0;background:var(--sunk);border:1px solid var(--rule);border-radius:10px;padding:17px 19px;overflow-x:auto;font-family:var(--mono);font-size:.82rem;line-height:1.7;}
+pre.code .c{color:var(--ink-soft);}
+pre.code .h{color:var(--ctl);font-weight:500;}
+pre.code .m{color:var(--money);font-weight:500;}
+pre.code .t{color:var(--trust);font-weight:500;}
+.next{display:flex;flex-wrap:wrap;gap:8px;}
+.next span{font-family:var(--mono);font-size:.75rem;padding:6px 13px;border:1px dashed var(--rule);border-radius:999px;color:var(--ink-soft);}
+
+/* origins */
+.hist{display:flex;flex-direction:column;border-top:1px solid var(--rule);}
+.hrow{display:grid;grid-template-columns:62px 1.05fr 1.7fr;gap:4px 24px;padding:12px 2px;border-bottom:1px solid var(--rule);align-items:baseline;}
+.hrow .yr{font-family:var(--mono);font-weight:600;font-size:.88rem;font-variant-numeric:tabular-nums;color:var(--ink-soft);}
+.hrow .what{font-family:var(--mono);font-size:.9rem;font-weight:500;line-height:1.4;}
+.hrow .who{display:block;font-weight:400;font-size:.78rem;color:var(--ink-soft);letter-spacing:.01em;}
+.hrow .why{font-size:.93rem;line-height:1.5;color:var(--ink-soft);}
+.hrow .why em{color:var(--ink);font-style:normal;font-weight:600;}
+
+/* spec strips */
+.specs{display:flex;flex-direction:column;border-top:1px solid var(--rule);}
+.spec{display:grid;grid-template-columns:200px 1fr;gap:10px 28px;padding:24px 2px;border-bottom:1px solid var(--rule);}
+.spec-id{display:flex;flex-direction:column;gap:8px;align-items:flex-start;}
+.spec-id h3{font-size:1.12rem;}
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:16px 28px;}
+.spec-item .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:4px;}
+.spec-item .v{font-size:.92rem;line-height:1.5;}
+.spec-item .v b{font-weight:600;}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+
+.note{background:var(--sunk);border-left:3px solid var(--ink-soft);border-radius:0 10px 10px 0;padding:16px 20px;font-size:.97rem;max-width:74ch;}
+.note b{font-weight:600;}
+.note.money{border-left-color:var(--money);color:var(--ink);}
+.note.trust{border-left-color:var(--trust);color:var(--ink);}
+.note.gpu{border-left-color:var(--gpu);color:var(--ink);}
+
+footer{border-top:1px solid var(--rule);padding-top:26px;margin-top:40px;font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);}
+
+@media (max-width:980px){
+  .trio{grid-template-columns:1fr;}
+  .toc{grid-template-columns:1fr 1fr;}
+}
+@media (max-width:780px){
+  .duo{grid-template-columns:1fr;}
+  .hrow{grid-template-columns:56px 1fr;}
+  .hrow .why{grid-column:2;}
+  .toc{grid-template-columns:1fr;}
+  .spec{grid-template-columns:1fr;}
+  .rung{grid-template-columns:1fr;gap:4px;}
+  .bits{flex-wrap:wrap;}
+  .bit{flex:1 1 45%!important;border-bottom:1px solid var(--rule);}
+}
+@media (min-width:1180px){
+  .toc{display:none;}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-soft)"/></marker>
+    <marker id="ah-edge" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--edge)"/></marker>
+    <marker id="ah-trust" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--trust)"/></marker>
+    <marker id="ah-money" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--money)"/></marker>
+    <marker id="ah-gpu" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--gpu)"/></marker>
+    <marker id="ah-ctl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ctl)"/></marker>
+  </defs>
+</svg>
+<header class="topbar">
+  <a class="brand" href="#top">Keys<em>,</em> Queues <em>&amp;</em> Caches</a>
+  <nav class="parts" aria-label="Parts">
+    <a href="#s01" data-part="1">The request path</a>
+    <a href="#s04" data-part="2">The key is the perimeter</a>
+    <a href="#s07" data-part="3">Sharing a GPU</a>
+    <a href="#s10" data-part="4">Capacity</a>
+    <a href="#s13" data-part="5">A region, sized</a>
+  </nav>
+  <nav class="utils">
+    <a href="#s00" data-part="0">Origins</a>
+    <a href="#glossary" data-part="6">Glossary</a>
+    <a href="#" id="showAll">Show all</a>
+  </nav>
+</header>
+
+<nav class="rail" aria-label="Contents">
+  <a class="rail-title" href="#top">Keys, Queues<br>and Caches</a>
+    <div class="rail-g" data-part="0" hidden>
+      <div class="rail-h">Origins</div>
+        <a href="#s00"><span>—</span>Origins</a>
+    </div>
+    <div class="rail-g" data-part="1" hidden>
+      <div class="rail-h">I · The request path</div>
+        <a href="#s01"><span>01</span>The shape of it</a>
+        <a href="#s02"><span>02</span>The gateway holds on</a>
+        <a href="#s03"><span>03</span>The latency budget</a>
+    </div>
+    <div class="rail-g" data-part="2" hidden>
+      <div class="rail-h">II · The key is the perimeter</div>
+        <a href="#s04"><span>04</span>Anatomy of a key</a>
+        <a href="#s05"><span>05</span>Verifying every request</a>
+        <a href="#s06"><span>06</span>When a key leaks</a>
+    </div>
+    <div class="rail-g" data-part="3" hidden>
+      <div class="rail-h">III · Sharing a GPU fairly</div>
+        <a href="#s07"><span>07</span>Inside one replica</a>
+        <a href="#s08"><span>08</span>Three layers of isolation</a>
+        <a href="#s09"><span>09</span>Choosing a replica</a>
+    </div>
+    <div class="rail-g" data-part="4" hidden>
+      <div class="rail-h">IV · Capacity that follows demand</div>
+        <a href="#s10"><span>10</span>What to scale on</a>
+        <a href="#s11"><span>11</span>Cold start</a>
+        <a href="#s12"><span>12</span>Ten models, one fleet</a>
+    </div>
+    <div class="rail-g" data-part="5" hidden>
+      <div class="rail-h">V · A region, end to end</div>
+        <a href="#s13"><span>13</span>A region, sized</a>
+    </div>
+    <div class="rail-g" data-part="6" hidden>
+      <div class="rail-h">Reference</div>
+        <a href="#coda"><span>—</span>Coda · bound it, spend it locally</a>
+        <a href="#glossary"><span>—</span>Glossary</a>
+    </div>
+  <button class="foldall" type="button">Collapse all</button>
+</nav>
+
+<div class="wrap">
+
+<header class="hero" id="top">
+  <div class="eyebrow">An inference guide · from the API key down to the KV cache</div>
+  <h1>Keys, queues<br>and caches</h1>
+  <p class="lede">Anyone holding about seventy characters can ask a fleet of GPUs to think for them, on replicas shared with everyone else. This guide designs that service — regional, multi-tenant, ten models, autoscaled — starting from the request path and working inward.</p>
+  <div class="key">
+    <span><i style="background:var(--edge)"></i> the request path</span>
+    <span><i style="background:var(--trust)"></i> keys · trust</span>
+    <span><i style="background:var(--gpu)"></i> the GPU · the engine</span>
+    <span><i style="background:var(--ctl)"></i> control loops · capacity</span>
+  </div>
+
+  <div class="paths">
+    <div class="path">
+      <b>You’re building the API</b>
+      <span>The path a request takes, the key that opens it, and what keeps it fast.</span>
+      <div class="hops"><a href="#s01">01</a> <a href="#s02">02</a> <a href="#s03">03</a> <a href="#s04">04</a></div>
+    </div>
+    <div class="path">
+      <b>You run the GPUs</b>
+      <span>What a replica actually runs out of, and how capacity follows demand.</span>
+      <div class="hops"><a href="#s07">07</a> <a href="#s08">08</a> <a href="#s10">10</a> <a href="#s11">11</a></div>
+    </div>
+    <div class="path">
+      <b>You own the platform</b>
+      <span>How the fleet is kept safe, shared fairly, and sized.</span>
+      <div class="hops"><a href="#s06">06</a> <a href="#s08">08</a> <a href="#s12">12</a> <a href="#s13">13</a></div>
+    </div>
+    <div class="path">
+      <b>The whole thing</b>
+      <span>Open Origins and follow Next. Each part assumes the one before it.</span>
+      <div class="hops"><a href="#s00">00</a></div>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <div>
+      <div class="toc-h">I · The request path</div>
+      <ul>
+        <li><span class="no">01</span><a href="#s01">The shape of it</a></li>
+        <li><span class="no">02</span><a href="#s02">The gateway holds on</a></li>
+        <li><span class="no">03</span><a href="#s03">The latency budget</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">II · The key is the perimeter</div>
+      <ul>
+        <li><span class="no">04</span><a href="#s04">Anatomy of a key</a></li>
+        <li><span class="no">05</span><a href="#s05">Verifying every request</a></li>
+        <li><span class="no">06</span><a href="#s06">When a key leaks</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">III · Sharing a GPU fairly</div>
+      <ul>
+        <li><span class="no">07</span><a href="#s07">Inside one replica</a></li>
+        <li><span class="no">08</span><a href="#s08">Three layers of isolation</a></li>
+        <li><span class="no">09</span><a href="#s09">Choosing a replica</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">IV · Capacity that follows demand</div>
+      <ul>
+        <li><span class="no">10</span><a href="#s10">What to scale on</a></li>
+        <li><span class="no">11</span><a href="#s11">Cold start</a></li>
+        <li><span class="no">12</span><a href="#s12">Ten models, one fleet</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="toc-h">V · A region, end to end</div>
+      <ul>
+        <li><span class="no">13</span><a href="#s13">A region, sized</a></li>
+      </ul>
+    </div>
+  </nav>
+  <button class="foldall" type="button">Collapse all</button>
+</header>
+
+
+<section id="s00">
+  <details open>
+    <summary>
+      <div class="eyebrow">Origins</div>
+      <h2>Who built this, and what for</h2>
+      <p class="q">Why does an inference API look the way it does?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">The serving stack was assembled in about eight years, mostly by people trying to fit more conversations onto the same GPU. The trust model around it — one bearer key per caller — was borrowed from web APIs, and has barely changed since.</p>
+
+  <div class="hist">
+    <div class="hrow"><span class="yr">2017</span><span class="what" style="color:var(--gpu)">The Transformer<span class="who">Vaswani et al., Google · “Attention Is All You Need”</span></span><span class="why">Generating one token at a time means every step re-reads the keys and values of every earlier token. Caching them — the <em>KV cache</em> — is where most of the rest of this guide spends its memory.</span></div>
+    <div class="hrow"><span class="yr">2018</span><span class="what" style="color:var(--gpu)">TensorRT Inference Server → Triton<span class="who">NVIDIA</span></span><span class="why">Dynamic batching: hold requests for a few milliseconds and run them together. It batches <em>requests</em>, which works for a classifier and badly for a stream whose length nobody knows.</span></div>
+    <div class="hrow"><span class="yr">2018</span><span class="what" style="color:var(--trust)">Token scanning<span class="who">GitHub</span></span><span class="why">Providers register the shape of their secrets; GitHub reports matches pushed to public repositories. The single most useful thing a key format can do is be recognisable.</span></div>
+    <div class="hrow"><span class="yr">2020</span><span class="what" style="color:var(--edge)">The GPT-3 API<span class="who">OpenAI</span></span><span class="why">A model behind a bearer key, priced per token. Every inference API since has inherited the shape — including the fact that the key is the whole perimeter.</span></div>
+    <div class="hrow"><span class="yr">2021</span><span class="what" style="color:var(--trust)">Prefixed, checksummed tokens<span class="who">GitHub · <code>ghp_…</code></span></span><span class="why">A prefix that names the issuer and a checksum that lets anyone reject a typo offline. Section 04 copies both.</span></div>
+    <div class="hrow"><span class="yr">2022</span><span class="what" style="color:var(--gpu)">Orca<span class="who">Yu et al., Seoul National University · OSDI ’22</span></span><span class="why">Schedule per <em>iteration</em>, not per request: a sequence joins the batch when it arrives and leaves when it finishes. Continuous batching is now the default everywhere.</span></div>
+    <div class="hrow"><span class="yr">2022</span><span class="what" style="color:var(--gpu)">FlashAttention<span class="who">Tri Dao et al., Stanford</span></span><span class="why">Attention rewritten around memory traffic rather than arithmetic. The first loud signal that inference is bandwidth-bound.</span></div>
+    <div class="hrow"><span class="yr">2023</span><span class="what" style="color:var(--edge)">Chat Completions over SSE<span class="who">OpenAI</span></span><span class="why"><code>POST /v1/chat/completions</code> with <code>stream: true</code> became the de facto wire protocol — which is why this guide assumes it rather than designing one.</span></div>
+    <div class="hrow"><span class="yr">2023</span><span class="what" style="color:var(--gpu)">PagedAttention · vLLM<span class="who">Kwon et al., UC Berkeley · SOSP ’23</span></span><span class="why">Allocate the KV cache in fixed-size blocks, like virtual memory pages. Fragmentation went away, and serving throughput for the same GPU went up severalfold.</span></div>
+    <div class="hrow"><span class="yr">2023</span><span class="what" style="color:var(--gpu)">Speculative decoding<span class="who">Leviathan et al., Google · Chen et al., DeepMind</span></span><span class="why">Let a small model guess several tokens and have the large one check them in one pass. Same output distribution, fewer expensive steps.</span></div>
+    <div class="hrow"><span class="yr">2024</span><span class="what" style="color:var(--gpu)">RadixAttention · SGLang<span class="who">Zheng et al., LMSYS</span></span><span class="why">Keep KV blocks after a request finishes and index them by prefix, so the next request with the same system prompt skips its prefill. Useful, and — across tenants — a side channel.</span></div>
+    <div class="hrow"><span class="yr">2024</span><span class="what" style="color:var(--gpu)">Virtual Token Counter<span class="who">Sheng et al. · OSDI ’24 · “Fairness in Serving LLMs”</span></span><span class="why">Fairness measured in tokens served, not requests. The first scheduler designed for the question in Part IV: who gets the next slot in the batch?</span></div>
+    <div class="hrow"><span class="yr">2024</span><span class="what" style="color:var(--gpu)">DistServe · Splitwise<span class="who">Zhong et al., OSDI ’24 · Patel et al., Microsoft, ISCA ’24</span></span><span class="why">Prefill and decode want different hardware balances, so run them on different GPUs and ship the KV cache between them.</span></div>
+    <div class="hrow"><span class="yr">2025</span><span class="what" style="color:var(--ctl)">Inference Gateway · llm-d · Dynamo<span class="who">Kubernetes SIG Network · Red Hat, Google, IBM et al. · NVIDIA</span></span><span class="why">Routing that reads the engine’s queue and cache instead of counting connections. Load balancing finally learned what it was balancing.</span></div>
+  </div>
+
+  <div class="note"><b>The pattern worth noticing:</b> nearly all of the invention is below the API — batching, paging, caching, routing. Above it, the design is a 2020 web API that nobody revisited: a bearer key and an HTTP endpoint. Shared, public, multi-tenant service is exactly where that inheritance stops being enough, and it is where this guide spends Parts II and III.</div>
+      <nav class="seq">
+        <a class="seq-next" href="#s01"><span>Next</span>01 — The shape of it</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="1">
+  <div class="part-n">Part I</div>
+  <div class="part-t">The request path</div>
+  <p class="part-d">One POST, followed from the public internet to the first token and back. Every promise the service makes — speed, fairness, safety — is either enforced on this path or not at all.</p>
+</div>
+
+<section id="s01">
+  <details open>
+    <summary>
+      <div class="eyebrow">01 — The shape of it</div>
+      <h2>Seven checks before a GPU sees a token</h2>
+      <p class="q">What happens between <code>POST</code> and the first token?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">The service has one door. Everything that makes it safe to share — the key check, the limits, the routing — happens in a stateless gateway that stays on the connection until the last token has been sent.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 1000 540" role="img" aria-label="The request path: client to an L4 load balancer to a gateway running seven checks, then over mTLS to a model pool of replicas. A key service and a limit service sit beside the gateway.">
+      <rect class="s-zone" x="270" y="50" width="380" height="400" rx="14"/>
+      <rect class="s-zone" x="690" y="50" width="290" height="250" rx="14"/>
+      <text class="s-ts" x="270" y="40">gateway · stateless · N per zone</text>
+      <text class="s-ts" x="690" y="40">model pool · one per catalog model</text>
+
+      <rect class="s-box" x="20" y="205" width="100" height="64" rx="10"/>
+      <text class="s-tb s-tm" x="70" y="232">client</text>
+      <text class="s-ts s-tm" x="70" y="252">API key</text>
+      <rect class="s-box" x="150" y="205" width="92" height="64" rx="10"/>
+      <text class="s-tb s-tm" x="196" y="232">L4 LB</text>
+      <text class="s-ts s-tm" x="196" y="252">conn caps</text>
+      <g class="edge">
+        <line class="s-flow" x1="120" y1="226" x2="147" y2="226" marker-end="url(#ah-edge)"/>
+        <line class="s-flow" x1="242" y1="226" x2="267" y2="226" marker-end="url(#ah-edge)"/>
+        <line class="s-dash" x1="268" y1="250" x2="245" y2="250" marker-end="url(#ah-edge)"/>
+        <line class="s-dash" x1="150" y1="250" x2="123" y2="250" marker-end="url(#ah-edge)"/>
+      </g>
+
+      <g class="trust">
+        <rect class="s-card" x="290" y="72" width="340" height="40" rx="8"/>
+        <rect class="s-card" x="290" y="122" width="340" height="40" rx="8"/>
+        <rect class="s-card" x="290" y="172" width="340" height="40" rx="8"/>
+        <text class="s-tb" x="304" y="97" fill="currentColor" style="fill:var(--trust)">0</text>
+        <text class="s-tb" x="304" y="147" style="fill:var(--trust)">1</text>
+        <text class="s-tb" x="304" y="197" style="fill:var(--trust)">2</text>
+      </g>
+      <text class="s-t" x="326" y="97">pre-auth limiter · per IP</text>
+      <text class="s-t" x="326" y="147">parse key · checksum</text>
+      <text class="s-t" x="326" y="197">verify key · local cache</text>
+      <text class="s-ts s-te" x="618" y="97">&lt;10 µs</text>
+      <text class="s-ts s-te" x="618" y="147">&lt;1 µs</text>
+      <text class="s-ts s-te" x="618" y="197">~2 µs</text>
+
+      <g class="edge">
+        <rect class="s-card" x="290" y="222" width="340" height="40" rx="8"/>
+        <rect class="s-card" x="290" y="272" width="340" height="40" rx="8"/>
+      </g>
+      <text class="s-tb" x="304" y="247" style="fill:var(--edge)">3</text>
+      <text class="s-tb" x="304" y="297" style="fill:var(--edge)">4</text>
+      <text class="s-t" x="326" y="247">validate · model, max_tokens</text>
+      <text class="s-t" x="326" y="297">chat template · tokenize</text>
+      <text class="s-ts s-te" x="618" y="247">&lt;1 ms</text>
+      <text class="s-ts s-te" x="618" y="297">0.2–5 ms</text>
+
+      <g class="edge"><rect class="s-card" x="290" y="322" width="340" height="40" rx="8"/></g>
+      <text class="s-tb" x="304" y="347" style="fill:var(--edge)">5</text>
+      <text class="s-t" x="326" y="347">admit · token + stream limits</text>
+      <text class="s-ts s-te" x="618" y="347">~5 µs</text>
+
+      <g class="gpu"><rect class="s-card" x="290" y="372" width="340" height="40" rx="8"/></g>
+      <text class="s-tb" x="304" y="397" style="fill:var(--gpu)">6</text>
+      <text class="s-t" x="326" y="397">pick replica · load + prefix</text>
+      <text class="s-ts s-te" x="618" y="397">~10 µs</text>
+      <text class="s-ts" x="290" y="436">no synchronous network call on the common path</text>
+
+      <g class="gpu">
+        <rect class="s-card" x="708" y="70" width="254" height="46" rx="8"/>
+        <rect class="s-card" x="708" y="126" width="254" height="46" rx="8"/>
+        <rect class="s-card" x="708" y="182" width="254" height="46" rx="8"/>
+        <path class="s-flow" d="M630,392 C 672,392 668,149 705,149" marker-end="url(#ah-gpu)"/>
+        <line class="s-dash" x1="707" y1="93" x2="653" y2="93" marker-end="url(#ah-gpu)"/>
+      </g>
+      <text class="s-t" x="722" y="91">replica · vLLM · TP=2</text>
+      <text class="s-ts" x="722" y="107">continuous batching</text>
+      <text class="s-t" x="722" y="147">replica · vLLM · TP=2</text>
+      <text class="s-ts" x="722" y="163">fair queue · KV caps</text>
+      <text class="s-t" x="722" y="203">replica · vLLM · TP=2</text>
+      <text class="s-ts" x="722" y="219">chunked prefill</text>
+      <text class="s-ts s-tm" x="680" y="84">tokens</text>
+
+      <g class="ctl"><rect class="s-card" x="708" y="240" width="254" height="44" rx="8"/></g>
+      <text class="s-t" x="722" y="259" style="fill:var(--ctl)">autoscaler</text>
+      <text class="s-ts" x="722" y="275">queue wait · KV use → replicas</text>
+      <text class="s-ts" x="690" y="322">mTLS · token IDs</text>
+
+      <g class="edge">
+        <rect class="s-card" x="470" y="478" width="180" height="46" rx="8"/>
+        <line class="s-dash" x1="560" y1="476" x2="560" y2="453" marker-start="url(#ah-edge)" marker-end="url(#ah-edge)"/>
+      </g>
+      <text class="s-t" x="484" y="498">limit service</text>
+      <text class="s-ts" x="484" y="514">per-gateway shares</text>
+
+      <g class="trust">
+        <rect class="s-card" x="270" y="478" width="180" height="46" rx="8"/>
+        <line class="s-dash" x1="360" y1="476" x2="360" y2="453" marker-start="url(#ah-trust)" marker-end="url(#ah-trust)"/>
+      </g>
+      <text class="s-t" x="284" y="498">key service</text>
+      <text class="s-ts" x="284" y="514">records · revoke bus</text>
+    </svg>
+    <figcaption>Solid arrows are the request, dashed are the stream coming back and the <b>background</b> traffic that keeps the gateway’s local state fresh: key-cache fills and revocations from the key service, and each gateway’s <b>share</b> of every tenant’s limits from the limit service. The hop to a replica carries token IDs and a <b>signed context</b>, never the customer’s key (<a href="#s06">06</a>).</figcaption>
+  </figure>
+
+  <div class="walk">
+    <div><b>0</b><span>A per-IP limiter runs <em>before</em> authentication, so the auth path itself can’t be used to exhaust the gateway.</span></div>
+    <div><b>1</b><span>The key’s prefix and checksum are checked offline. Random strings are rejected without touching a cache or a database.</span></div>
+    <div><b>2</b><span>The key is looked up in the gateway’s own memory and its HMAC compared. The key service is off the path (<a href="#s05">05</a>).</span></div>
+    <div><b>3</b><span>The model must be in the key’s allowlist; <code>max_tokens</code> and prompt length are clamped to the catalog entry.</span></div>
+    <div><b>4</b><span>The gateway applies the model’s chat template and tokenizes. From here on the service knows the <em>exact</em> input token count.</span></div>
+    <div><b>5</b><span>Request, token and concurrency limits for this tenant and model, from buckets already in the gateway’s memory (<a href="#s08">08</a>).</span></div>
+    <div><b>6</b><span>A replica is picked from live engine metrics, preferring one that already has this tenant’s prefix cached (<a href="#s09">09</a>).</span></div>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>The promise</th><th>Where it is enforced</th><th>Mechanism</th><th>Section</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Fast under load</td><td>gateway budget · router · engine</td><td>≤ 5 ms added before the engine; load- and cache-aware routing; continuous batching with chunked prefill</td><td class="num"><a href="#s03">03</a> <a href="#s07">07</a> <a href="#s09">09</a></td></tr>
+        <tr><td class="nm">Autoscales</td><td>per-pool controller</td><td>scale on queue wait and KV use, not CPU; warm pools because cold start is minutes</td><td class="num"><a href="#s10">10</a> <a href="#s11">11</a> <a href="#s12">12</a></td></tr>
+        <tr><td class="nm">No noisy neighbours</td><td>gateway <em>and</em> engine</td><td>token-denominated limits at the edge; fair queue and per-tenant KV caps inside the batch</td><td class="num"><a href="#s08">08</a></td></tr>
+        <tr><td class="nm">The key is the perimeter</td><td>gateway stages 0–2 · the network</td><td>offline-checkable format, HMAC at rest, pushed revocation; replicas accept only the gateway</td><td class="num"><a href="#s04">04</a> <a href="#s05">05</a> <a href="#s06">06</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note trust"><b>The one rule everything else depends on:</b> replicas have no public ingress. They accept mTLS only from workload identities belonging to the gateway, and a network policy denies everything else. Every protection in this guide lives in the gateway, so a single path around it would make all of them decorative.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s00"><span>Previous</span>Origins</a>
+        <a class="seq-next" href="#s02"><span>Next</span>02 — The gateway holds on</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s02">
+  <details open>
+    <summary>
+      <div class="eyebrow">02 — The gateway holds on</div>
+      <h2>The gateway stays for the whole conversation</h2>
+      <p class="q">Why doesn’t the gateway hand the request to a replica and step aside?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A web gateway’s work is done once the response starts. Here the response is the expensive part — it can run for minutes, and every token of it is GPU time shared with everyone else.</p>
+
+  <div class="duo">
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Step aside · L4 pass-through</div>
+      <h3>Cheap, and blind</h3>
+      <ul>
+        <li>Gateway authenticates, then splices the client straight to a replica.</li>
+        <li>Fewer bytes through the gateway; <b>no per-token work</b>.</li>
+        <li>Cannot stop a stream part-way — for a revoked key, an output limit, or a drain — without teaching the replica about tenants.</li>
+        <li>Client disconnects become the replica’s problem, observed late or not at all.</li>
+      </ul>
+    </div>
+    <div class="card edgec">
+      <div class="tag" style="color:var(--edge)">Stay on the path · L7 proxy</div>
+      <h3>Expensive, and in control</h3>
+      <ul>
+        <li>Gateway proxies every SSE event from the replica to the client.</li>
+        <li><b>Counts tokens as they pass</b>, enforces output-token limits, and can end the stream cleanly.</li>
+        <li>Sees the client go away the moment it happens, and <b>aborts the engine request</b>.</li>
+        <li>Replicas know nothing about keys or tenants beyond a signed context.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="body">This is the choice that makes mid-stream enforcement possible at all — revocation, output limits, clean shutdown — and it keeps the engine a pure compute service. The cost is that the gateway holds long-lived connections. It stops being sized by requests per second and starts being sized by <em>concurrent streams</em> — which Little’s law gives directly: 1,500 new streams a second that last 12 seconds on average is 18,000 open at once (<a href="#s13">13</a>).</p>
+
+  <div class="sub">
+    <h3>What goes over the wire</h3>
+    <p>Server-sent events: a long HTTP response of <code>data:</code> lines, each a JSON delta. The service adds two things the minimal protocol leaves out — a comment line every 15 seconds so idle proxies don’t cut a slow stream, and a <em>typed error event</em> for the case where the stream has to stop early.</p>
+  </div>
+  <pre class="code"><span class="c"># a normal stream</span>
+data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{"content":"The"}}]}
+
+data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{"content":" answer"}}]}
+
+<span class="h">: keepalive</span>
+
+data: {"id":"chatcmpl-7f3a","choices":[],"usage":{"prompt_tokens":812,"completion_tokens":214}}
+
+data: [DONE]
+
+<span class="c"># the same stream, when its key is revoked part-way (05)</span>
+data: {"id":"chatcmpl-7f3a","choices":[{"index":0,"delta":{},"finish_reason":"key_revoked"}]}
+
+data: {"error":{"type":"key_revoked","message":"the API key for this request was revoked"}}
+
+data: [DONE]</pre>
+
+  <div class="sub">
+    <h3>A disconnect is an abort</h3>
+    <p>When the client closes the connection — or an HTTP/2 client resets the stream — the gateway cancels its upstream request, and the engine frees that sequence’s KV blocks on its next step. Without this, a user who presses stop and retries twice costs three full generations, and the replica spends its memory on answers nobody will read.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Tokenize once, at the edge</h3>
+    <p>The gateway applies the model’s chat template and tokenizes, then sends <em>token IDs</em> to the engine rather than text. The engine skips its own tokenization, and the gateway knows the exact input token count before admission — which token-denominated limits depend on (<a href="#s08">08</a>). The tokenizer and template are versioned with the model: they ship in the same catalog release as the weights, and the gateway refuses to route to a replica whose model revision doesn’t match its own.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Deploying a gateway without cutting streams</h3>
+    <p>A gateway pod being replaced stops accepting new connections, then keeps its existing streams until they finish or reach the service’s maximum stream duration — ten minutes here, enforced for exactly this reason. Anything still open at the deadline gets a <code>server_shutdown</code> error event rather than a reset, so clients can retry with a clear conscience. The drain window sets how fast a gateway rollout can go; it is typically the slowest part of shipping the edge.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s01"><span>Previous</span>01 — The shape of it</a>
+        <a class="seq-next" href="#s03"><span>Next</span>03 — The latency budget</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s03">
+  <details open>
+    <summary>
+      <div class="eyebrow">03 — The latency budget</div>
+      <h2>Five milliseconds, spent in advance</h2>
+      <p class="q">How much can the service add before the GPU even starts?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Users feel two numbers: time to first token, and the gap between tokens after that. The gateway can only make the first one worse, so it gets a fixed budget and nothing on its path is allowed to wait on the network.</p>
+
+  <figure>
+    <svg viewBox="0 0 960 220" role="img" aria-label="Two timelines of time to first token. At moderate load, 5 ms of gateway, 80 ms of queue wait and 150 ms of prefill. At 90 percent utilisation the queue wait grows to 300 ms while the gateway stays at 5 ms.">
+      <text class="s-ts" x="40" y="30">moderate load</text>
+      <rect x="40" y="40" width="11" height="34" rx="3" style="fill:var(--edge)"/>
+      <rect x="51" y="40" width="176" height="34" style="fill:var(--ctl-wash)"/>
+      <rect x="227" y="40" width="330" height="34" style="fill:var(--gpu-wash)"/>
+      <text class="s-ts" x="60" y="62">queue wait · 80 ms</text>
+      <text class="s-ts" x="240" y="62">prefill · 150 ms</text>
+      <g class="gpu">
+        <line x1="557" y1="34" x2="557" y2="80" stroke="currentColor" stroke-width="2.5"/>
+        <line x1="612" y1="46" x2="612" y2="68" stroke="currentColor" stroke-width="2"/>
+        <line x1="667" y1="46" x2="667" y2="68" stroke="currentColor" stroke-width="2"/>
+        <line x1="722" y1="46" x2="722" y2="68" stroke="currentColor" stroke-width="2"/>
+        <line x1="777" y1="46" x2="777" y2="68" stroke="currentColor" stroke-width="2"/>
+        <line x1="832" y1="46" x2="832" y2="68" stroke="currentColor" stroke-width="2"/>
+        <line x1="887" y1="46" x2="887" y2="68" stroke="currentColor" stroke-width="2"/>
+      </g>
+      <text class="s-ts" x="563" y="94">first token · 235 ms</text>
+      <text class="s-ts" x="740" y="94">then one every ~25 ms</text>
+
+      <text class="s-ts" x="40" y="126">90% utilisation</text>
+      <rect x="40" y="136" width="11" height="34" rx="3" style="fill:var(--edge)"/>
+      <rect x="51" y="136" width="660" height="34" style="fill:var(--ctl-wash)"/>
+      <rect x="711" y="136" width="209" height="34" style="fill:var(--gpu-wash)"/>
+      <text class="s-ts" x="60" y="158">queue wait · 300 ms — the part that grows</text>
+      <text class="s-ts" x="724" y="158">prefill → first token ~455 ms</text>
+
+      <line x1="40" y1="194" x2="920" y2="194" stroke="var(--rule)" stroke-width="1.5"/>
+      <text class="s-ts s-tm" x="40" y="212">0</text>
+      <text class="s-ts s-tm" x="260" y="212">100 ms</text>
+      <text class="s-ts s-tm" x="480" y="212">200 ms</text>
+      <text class="s-ts s-tm" x="700" y="212">300 ms</text>
+      <text class="s-ts s-tm" x="920" y="212">400 ms</text>
+    </svg>
+    <figcaption>The <b>blue sliver</b> is the whole gateway. Illustrative numbers for a 2,000-token prompt on a 70B model. As utilisation rises the gateway’s share doesn’t move — <b>queue wait</b> does, and it grows without limit as the pool approaches saturation. That is the autoscaler’s job (<a href="#s10">10</a>), not the gateway’s.</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Stage</th><th>p99 budget</th><th>What keeps it there</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">TLS + HTTP parse</td><td class="num">~0.3 ms</td><td>Connection reuse; the handshake is paid once per client connection, not per request</td></tr>
+        <tr><td class="nm">pre-auth limiter</td><td class="num">&lt; 10 µs</td><td>In-memory token bucket keyed by source IP and /24</td></tr>
+        <tr><td class="nm">key check</td><td class="num">~2 µs</td><td>CRC, hash-map lookup, one HMAC-SHA256 over 32 bytes, constant-time compare</td></tr>
+        <tr><td class="nm">JSON + validation</td><td class="num">0.1–1 ms</td><td>Scales with body size; a 100k-token prompt is roughly half a megabyte of JSON</td></tr>
+        <tr><td class="nm">template + tokenize</td><td class="num">0.2–5 ms</td><td>Runs in parallel with the key check; fast tokenizers, pinned per model revision</td></tr>
+        <tr><td class="nm">admission</td><td class="num">~5 µs</td><td>Local token buckets holding this gateway’s share of the tenant’s limits — no remote call</td></tr>
+        <tr><td class="nm">routing</td><td class="num">~10 µs</td><td>Engine metrics already in memory, pushed every 100 ms</td></tr>
+        <tr><td class="nm">hop to replica</td><td class="num">0.2–1 ms</td><td>Same zone preferred; cross-zone within a region is well under a millisecond</td></tr>
+      </tbody>
+      <tfoot><tr><td class="nm">total</td><td class="num">&lt; 5 ms</td><td>Excluding tokenization of very long prompts, which is proportional to what the customer sent</td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="duo">
+    <div class="card edgec">
+      <div class="tag" style="color:var(--edge)">On the path</div>
+      <h3>Memory, arithmetic, one hop</h3>
+      <ul>
+        <li>Key cache, token buckets, engine metrics — all local.</li>
+        <li>Every remote dependency is refreshed <b>in the background</b> and has a defined stale behaviour.</li>
+        <li>The only synchronous remote call is the replica itself.</li>
+      </ul>
+    </div>
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Deliberately off it</div>
+      <h3>Anything that can be slow</h3>
+      <ul>
+        <li>No database read to check a key; no call to the limit service per request.</li>
+        <li>No synchronous access log — logs are buffered and shipped.</li>
+        <li>Limit shares are rebalanced in the background, once a second (<a href="#s08">08</a>).</li>
+      </ul>
+    </div>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s02"><span>Previous</span>02 — The gateway holds on</a>
+        <a class="seq-next" href="#s04"><span>Next</span>04 — Anatomy of a key</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="2">
+  <div class="part-n">Part II</div>
+  <div class="part-t">The key is the perimeter</div>
+  <p class="part-d">A bearer string is the only thing between the public internet and a fleet that costs thousands of dollars an hour. It has to be cheap to check a million times a second, useless if stolen from our database, recognisable if leaked, and dead within a second of being revoked.</p>
+</div>
+
+<section id="s04">
+  <details open>
+    <summary>
+      <div class="eyebrow">04 — Anatomy of a key</div>
+      <h2>Four fields, four jobs</h2>
+      <p class="q">What should an API key actually look like?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Most of a key’s security properties are decided by its format, before any code runs. A good format lets a scanner find it, a client catch a typo, the gateway reject garbage for free, and the database store nothing worth stealing.</p>
+
+  <div class="bits">
+    <div class="bit k-pre"><b>nc_live_</b><span>PREFIX · 8</span></div>
+    <div class="bit k-id"><b>k7Qm2xPz9aLr4TbV</b><span>KEY_ID · 16 · public</span></div>
+    <div class="bit k-sec"><b>_ 43 chars of base62 · 256 bits</b><span>SECRET · shown once · never stored</span></div>
+    <div class="bit k-crc"><b>_3fQ1Zx</b><span>CRC32 · 6</span></div>
+  </div>
+
+  <div class="specs">
+    <div class="spec">
+      <div class="spec-id"><span class="pill trustp">prefix</span><h3>Say who issued it</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Format</span><span class="v"><code>nc_live_</code> or <code>nc_test_</code>. Distinctive enough that a regex over all of GitHub has almost no false positives.</span></div>
+        <div class="spec-item"><span class="k">Why</span><span class="v">Registered with secret-scanning programmes, so a key pushed to a public repository is reported to us <b>within minutes</b> and revoked automatically (<a href="#s06">06</a>).</span></div>
+        <div class="spec-item"><span class="k">Also</span><span class="v">Test keys route only to a sandbox pool and can never reach production replicas — the environment is in the key, not in a header someone forgets.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill trustp">key_id</span><h3>A public handle</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Format</span><span class="v">16 base62 characters, random. Not secret — it appears in the dashboard, in logs, in support tickets.</span></div>
+        <div class="spec-item"><span class="k">Why</span><span class="v">The lookup is by <code>key_id</code>, never by the secret, so the database index is not a timing oracle on the secret and logs can name a key without holding it.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill trustp">secret</span><h3>The only secret part</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Format</span><span class="v">256 bits from the OS CSPRNG, base62-encoded to 43 characters.</span></div>
+        <div class="spec-item"><span class="k">Why</span><span class="v">Unguessable by construction. That entropy is what lets the service use a <b>fast</b> keyed hash instead of a slow password hash (below).</span></div>
+        <div class="spec-item"><span class="k">Lifecycle</span><span class="v">Displayed once at creation. The service stores only its HMAC and can never show it again.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill trustp">checksum</span><h3>Reject garbage for free</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Format</span><span class="v">CRC32 of everything before it, base62, 6 characters.</span></div>
+        <div class="spec-item"><span class="k">Why</span><span class="v">Scanners confirm a match offline; clients catch copy-paste errors; the gateway rejects random strings <b>with no lookup at all</b>. It is not a security control — it is a cost control.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Why HMAC and not bcrypt</h3>
+    <p>Slow password hashes exist to make guessing a <em>low-entropy</em> secret expensive after a database leak. A 256-bit random secret has no dictionary to guess from, so slowness buys nothing — and the service verifies on every request. At 50,000 requests a second, a 100 ms bcrypt check would need about 5,000 cores just to say yes.</p>
+  </div>
+
+  <div class="duo">
+    <div class="card inkc2">
+      <div class="tag" style="color:var(--ink-soft)">Password hash · bcrypt, argon2</div>
+      <h3>Right for humans</h3>
+      <ul>
+        <li>Protects secrets people chose, which are guessable.</li>
+        <li>Deliberately costs 50–500 ms.</li>
+        <li>Verification is too expensive to do per request, so systems end up caching the <b>plaintext</b> — which is worse.</li>
+      </ul>
+    </div>
+    <div class="card trustc">
+      <div class="tag" style="color:var(--trust)">Keyed hash · HMAC-SHA256 + pepper</div>
+      <h3>Right for machine secrets</h3>
+      <ul>
+        <li>Stores <code>HMAC(pepper, secret)</code>; the pepper lives in a KMS, not the database.</li>
+        <li>About a microsecond to verify.</li>
+        <li>A stolen dump of the keys table <b>cannot be checked offline</b> without the pepper.</li>
+        <li>Each record carries a <code>pepper_ver</code>, so the pepper can be rotated by re-hashing on next use.</li>
+      </ul>
+    </div>
+  </div>
+
+  <pre class="code"><span class="c">-- one row per key · what the gateway caches, and all it ever sees</span>
+key_id        k7Qm2xPz9aLr4TbV
+<span class="t">hmac          9f2c…e41a</span>                         <span class="c">-- HMAC-SHA256(pepper_v3, secret)</span>
+pepper_ver    3
+tenant_id     ten_4Kc…        project_id  prj_9Hx…
+scopes        [chat.completions]
+models        [llama-3.3-70b, qwen2.5-32b]        <span class="c">-- empty = whole catalog</span>
+<span class="m">token_quota   20M / day</span>                         <span class="c">-- per key, independent of tenant limits</span>
+ip_allow      [203.0.113.0/24]                    <span class="c">-- optional</span>
+status        active | throttled | revoked
+version       41                                  <span class="c">-- bumps on every change; caches compare it</span></pre>
+
+  <div class="note trust"><b>Compare the HMACs, in constant time.</b> The gateway computes <code>HMAC(pepper, presented_secret)</code> and compares it to the stored value with a constant-time equality. It never compares secrets, never logs them, and strips the <code>Authorization</code> header before anything is written anywhere.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s03"><span>Previous</span>03 — The latency budget</a>
+        <a class="seq-next" href="#s05"><span>Next</span>05 — Verifying every request</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s05">
+  <details open>
+    <summary>
+      <div class="eyebrow">05 — Verifying every request</div>
+      <h2>The key service is not on the request path</h2>
+      <p class="q">How do you check a key on every request without asking anyone?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Each gateway keeps its own copy of the keys it has seen. The key service fills it on a miss, pushes changes into it as they happen, and is otherwise never consulted — so an outage there does not become an outage of inference.</p>
+
+  <figure>
+    <svg viewBox="0 0 960 330" role="img" aria-label="Key verification flow. Checksum failure is rejected with no lookup. A local cache hit goes straight to the HMAC comparison. A miss consults a negative cache, then a single-flight fetch from the key service which fills the cache.">
+      <rect class="s-box" x="20" y="50" width="100" height="56" rx="10"/>
+      <text class="s-tb s-tm" x="70" y="83">request</text>
+      <g class="trust">
+        <rect class="s-card" x="150" y="50" width="150" height="56" rx="10"/>
+        <rect class="s-card" x="330" y="50" width="160" height="56" rx="10"/>
+        <rect class="s-card" x="520" y="50" width="190" height="56" rx="10"/>
+        <line class="s-flow" x1="120" y1="78" x2="147" y2="78" marker-end="url(#ah-trust)"/>
+        <line class="s-flow" x1="300" y1="78" x2="327" y2="78" marker-end="url(#ah-trust)"/>
+        <line class="s-flow" x1="490" y1="78" x2="517" y2="78" marker-end="url(#ah-trust)"/>
+      </g>
+      <text class="s-t s-tm" x="225" y="75">checksum ok?</text>
+      <text class="s-ts s-tm" x="225" y="93">offline</text>
+      <text class="s-t s-tm" x="410" y="75">in local cache?</text>
+      <text class="s-ts s-tm" x="410" y="93">~99.9% hit</text>
+      <text class="s-t s-tm" x="615" y="75">HMAC match · active?</text>
+      <text class="s-ts s-tm" x="615" y="93">constant time</text>
+      <text class="s-ts s-tm" x="313" y="68">yes</text>
+      <text class="s-ts s-tm" x="504" y="68">hit</text>
+
+      <g class="edge">
+        <rect class="s-card" x="760" y="50" width="160" height="56" rx="10"/>
+        <line class="s-flow" x1="710" y1="78" x2="757" y2="78" marker-end="url(#ah-edge)"/>
+      </g>
+      <text class="s-tb s-tm" x="840" y="75" style="fill:var(--edge)">on to admission</text>
+      <text class="s-ts s-tm" x="840" y="93">stage 3</text>
+      <text class="s-ts s-tm" x="734" y="68">yes</text>
+
+      <g class="inkc">
+        <line class="s-flow" x1="225" y1="106" x2="225" y2="157" marker-end="url(#ah)"/>
+        <line class="s-flow" x1="410" y1="106" x2="410" y2="157" marker-end="url(#ah)"/>
+        <line class="s-flow" x1="410" y1="210" x2="410" y2="247" marker-end="url(#ah)"/>
+        <line class="s-flow" x1="680" y1="106" x2="680" y2="157" marker-end="url(#ah)"/>
+      </g>
+      <text class="s-ts" x="232" y="136">no</text>
+      <text class="s-ts" x="417" y="136">miss</text>
+      <text class="s-ts" x="417" y="233">not cached as bad</text>
+      <text class="s-ts" x="687" y="136">no</text>
+
+      <rect class="s-box" x="150" y="160" width="150" height="50" rx="10"/>
+      <text class="s-t s-tm" x="225" y="182">401</text>
+      <text class="s-ts s-tm" x="225" y="198">zero lookups</text>
+      <rect class="s-box" x="330" y="160" width="160" height="50" rx="10"/>
+      <text class="s-t s-tm" x="410" y="182">negative cache?</text>
+      <text class="s-ts s-tm" x="410" y="198">hit → 401, 30 s</text>
+      <rect class="s-box" x="600" y="160" width="160" height="50" rx="10"/>
+      <text class="s-t s-tm" x="680" y="182">401</text>
+      <text class="s-ts s-tm" x="680" y="198">failure counted per IP</text>
+
+      <g class="trust">
+        <rect class="s-card" x="330" y="250" width="160" height="50" rx="10"/>
+        <path class="s-dash" d="M490,275 L545,275 L545,109" marker-end="url(#ah-trust)"/>
+      </g>
+      <text class="s-t s-tm" x="410" y="272">single-flight fetch</text>
+      <text class="s-ts s-tm" x="410" y="288">key service</text>
+      <text class="s-ts" x="553" y="262">fill cache</text>
+    </svg>
+    <figcaption><b>Random strings</b> stop at the checksum. <b>Forged key IDs</b> with a valid checksum stop at the negative cache after one lookup. Only real keys reach the key service, and only once per gateway per cache lifetime — <b>single-flight</b> collapses a thousand concurrent misses for the same key into one fetch.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>Revocation: pushed, with a TTL behind it</h3>
+    <p>A cache that is only refreshed on a timer makes revocation as slow as the timer. So changes are pushed, and the timer exists only to bound the case where a push is missed.</p>
+  </div>
+  <div class="walk">
+    <div><b>t+0</b><span>A key is revoked — by its owner, by support, or by the scanner in <a href="#s06">06</a>. The key service writes <code>status=revoked</code> and bumps <code>version</code>.</span></div>
+    <div><b>t+50ms</b><span>The change is published on a fan-out bus that every gateway subscribes to. Each drops its cached entry.</span></div>
+    <div><b>t+100ms</b><span>Each gateway also looks up <em>in-flight streams</em> for that key and ends them with a <code>key_revoked</code> error event. Revocation stops work in flight, not just new requests.</span></div>
+    <div><b>≤ 60 s</b><span>A gateway that was partitioned from the bus re-fetches every entry older than its TTL. This is the hard worst case, and it only applies to a gateway that is already unhealthy.</span></div>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Failure</th><th>Known keys</th><th>New keys</th><th>Revocations</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">key service down</td><td>keep working from cache <span class="pill trustp">fail static</span></td><td>fail closed · 503, retryable</td><td>queued; applied when it returns</td></tr>
+        <tr><td class="nm">revocation bus down</td><td>keep working</td><td>work (fetch path is separate)</td><td>bounded by the 60 s TTL</td></tr>
+        <tr><td class="nm">key DB down</td><td>keep working</td><td>fail closed</td><td>cannot be issued — dashboard shows it</td></tr>
+        <tr><td class="nm">gateway restart</td><td>cold cache: a burst of fetches, single-flighted, rate-limited per gateway</td><td>normal</td><td>normal</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub">
+    <h3>Protecting the check itself</h3>
+    <p>An attacker who can’t guess a key can still try to make checking keys expensive. Three cheap layers stop that: a per-IP and per-/24 limiter <em>before</em> authentication, a failed-auth counter that tightens the limiter for sources that keep failing, and the negative cache, which turns repeated forged IDs into memory lookups. None of this touches a GPU — the most a spray can cost is gateway CPU, which is the cheapest thing in the building.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s04"><span>Previous</span>04 — Anatomy of a key</a>
+        <a class="seq-next" href="#s06"><span>Next</span>06 — When a key leaks</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s06">
+  <details open>
+    <summary>
+      <div class="eyebrow">06 — When a key leaks</div>
+      <h2>Decide the blast radius before the leak</h2>
+      <p class="q">What limits the damage when a key ends up on GitHub?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Keys will leak — into repositories, notebooks, mobile apps, and screenshots. The design question is not how to prevent it but how much a leaked key can do before something notices, and the answer should be a limit the customer chose.</p>
+
+  <div class="ladder">
+    <div class="rung"><span class="n">1</span><div><h3>Secret scanning</h3><p>The prefix is registered with scanning programmes. A match in a public repository is reported, verified by checksum, and the key is <b>revoked automatically</b> with an email to the owner. This catches the most common leak in minutes, with nobody awake.</p></div></div>
+    <div class="rung"><span class="n">2</span><div><h3>Scope</h3><p>Keys belong to a project and can be limited to named models. A leaked key for an internal tool that only calls an 8B model <b>cannot call the 671B one</b>.</p></div></div>
+    <div class="rung"><span class="n">3</span><div><h3>Per-key quota</h3><p>A daily and monthly token quota on each key, enforced by the same buckets as the tenant’s limits (<a href="#s08">08</a>) and separate from them. A tenant with a very large allowance can still say this key may use <b>20M tokens a day</b>.</p></div></div>
+    <div class="rung"><span class="n">4</span><div><h3>Network allowlist</h3><p>Optional CIDR allowlist per key. For server-side keys this makes a leak nearly harmless — the key works only from the customer’s own egress addresses.</p></div></div>
+    <div class="rung"><span class="n">5</span><div><h3>Velocity anomaly</h3><p>Each key’s token rate is compared to its own recent history. Ten times its 7-day p99 sustained for five minutes moves the key to <code>throttled</code> — limits drop to baseline, the owner is notified — rather than <code>revoked</code>. <b>Throttling is reversible</b>; a false positive costs the customer latency, not an outage.</p></div></div>
+    <div class="rung"><span class="n">6</span><div><h3>Revocation</h3><p>Pushed to every gateway in well under a second, with in-flight streams ended too (<a href="#s05">05</a>). Rotation is painless because a project can hold several active keys at once.</p></div></div>
+  </div>
+
+  <div class="sub">
+    <h3>Replicas trust the gateway, not the key</h3>
+    <p>The customer’s key never leaves the gateway. What travels to the engine is a short-lived context the gateway signs, over an mTLS connection whose client certificate names a gateway workload. The engine verifies the signature and uses the claims for scheduling and usage records — it has no way to authenticate a customer, and no reason to.</p>
+  </div>
+  <pre class="code"><span class="c"># internal request context · Ed25519-signed by the gateway · never seen by the client</span>
+{
+  "tenant":   "ten_4Kc…",
+  "project":  "prj_9Hx…",
+  "key_id":   "k7Qm2xPz9aLr4TbV",          <span class="c"># for usage records and audit</span>
+  "request":  "req_01J9…",                  <span class="c"># for tracing and abort</span>
+  "class":    "interactive",                <span class="c"># or batch — used by the fair queue (08)</span>
+  "weight":   4,                            <span class="c"># tier weight in the scheduler</span>
+  "salt":     "a91f…",                      <span class="c"># prefix-cache salt, per tenant (08)</span>
+  "exp":      1759219800                    <span class="c"># max stream duration + margin</span>
+}</pre>
+
+  <div class="note trust"><b>Defence in depth, stated plainly:</b> if an attacker got inside the cluster network they would still need a gateway’s workload certificate to reach a replica, and a gateway’s signing key to make a replica do work on someone else’s account. Neither is on disk; both rotate hourly.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s05"><span>Previous</span>05 — Verifying every request</a>
+        <a class="seq-next" href="#s07"><span>Next</span>07 — Inside one replica</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="3">
+  <div class="part-n">Part III</div>
+  <div class="part-t">Sharing a GPU fairly</div>
+  <p class="part-d">Everyone’s requests end up in the same batch on the same replica. Gateway limits decide who gets in the door; what happens inside the engine decides whether one customer can make everyone else slow.</p>
+</div>
+
+<section id="s07">
+  <details open>
+    <summary>
+      <div class="eyebrow">07 — Inside one replica</div>
+      <h2>Memory runs out before compute does</h2>
+      <p class="q">What is the scarce resource on a shared replica?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A replica does two very different kinds of work, and the thing they compete for is not FLOPs but the KV cache — gigabytes of per-sequence state that must stay in GPU memory for as long as a stream is alive.</p>
+
+  <div class="duo">
+    <div class="card gpuc">
+      <div class="tag" style="color:var(--gpu)">Prefill</div>
+      <h3>Read the prompt</h3>
+      <ul>
+        <li>All prompt tokens processed in parallel, in one pass.</li>
+        <li><b>Compute-bound</b>: large matrix multiplies, GPU busy.</li>
+        <li>Writes the prompt’s keys and values into the KV cache.</li>
+        <li>Sets time to first token. A long prompt makes it long.</li>
+      </ul>
+    </div>
+    <div class="card gpuc">
+      <div class="tag" style="color:var(--gpu)">Decode</div>
+      <h3>Write the answer</h3>
+      <ul>
+        <li>One token per sequence per step, every sequence in the batch together.</li>
+        <li><b>Memory-bandwidth-bound</b>: every step reads all the weights and each sequence’s KV cache.</li>
+        <li>Batching is almost free until the KV cache is full.</li>
+        <li>Sets inter-token latency — what streaming feels like.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="body">Continuous batching lets sequences join and leave the batch on every step, so the batch stays full. What limits how full it can get is how many tokens of KV cache fit in memory. The size per token is fixed by the model’s architecture:</p>
+  <pre class="code"><span class="c"># bytes of KV cache per token</span>
+<span class="h">2 × layers × kv_heads × head_dim × bytes_per_value</span>          <span class="c"># 2 = one K and one V</span></pre>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Layers</th><th>KV heads × dim</th><th>Per token · bf16</th><th>One 32k-token context</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">Llama 3.1 8B</td><td class="num">32</td><td class="num">8 × 128</td><td class="num">128 KiB</td><td class="num">4 GiB</td></tr>
+        <tr><td class="nm">Qwen2.5 32B</td><td class="num">64</td><td class="num">8 × 128</td><td class="num">256 KiB</td><td class="num">8 GiB</td></tr>
+        <tr><td class="nm">Llama 3.3 70B</td><td class="num">80</td><td class="num">8 × 128</td><td class="num">320 KiB</td><td class="num">10 GiB</td></tr>
+        <tr><td class="nm">Mixtral 8×22B</td><td class="num">56</td><td class="num">8 × 128</td><td class="num">224 KiB</td><td class="num">7 GiB</td></tr>
+        <tr><td class="nm">DeepSeek-V3 (MLA)</td><td class="num">61</td><td class="num">1 latent × 576</td><td class="num">~69 KiB</td><td class="num">~2.1 GiB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 960 170" role="img" aria-label="KV cache of one 70B replica, about 229 thousand tokens. One tenant's single 128 thousand token request takes 56 percent; forty other chats take 35 percent; 9 percent is free.">
+      <text class="s-ts" x="40" y="26">KV cache · Llama 3.3 70B · FP8 weights on 2 × H100 · ~75 GB left for KV ≈ 229k tokens</text>
+      <rect class="s-box" x="40" y="40" width="880" height="48" rx="6"/>
+      <rect x="40" y="40" width="493" height="48" rx="6" style="fill:var(--trust-wash);stroke:var(--trust);stroke-width:1.5"/>
+      <rect x="533" y="40" width="308" height="48" style="fill:var(--gpu-wash);stroke:var(--gpu);stroke-width:1.5"/>
+      <text class="s-t" x="54" y="62">tenant A · one request · 128k tokens</text>
+      <text class="s-ts" x="54" y="79">56% of the replica</text>
+      <text class="s-t" x="547" y="62">40 chats · 12 tenants</text>
+      <text class="s-ts" x="547" y="79">2k tokens each · 35%</text>
+      <text class="s-ts" x="850" y="69">9% free</text>
+      <text class="s-ts" x="40" y="118">The next few short chats fit. A second long request from anyone does not: it waits, or the engine preempts sequences to make room.</text>
+      <text class="s-ts" x="40" y="138">Tenant A is well inside any request-per-second limit. It is using one request a minute.</text>
+      <text class="s-ts" x="40" y="158">This is how one customer wrecks a shared replica — not with traffic, with memory.</text>
+    </svg>
+    <figcaption>Blocks are allocated in pages of 16 tokens (<b>PagedAttention</b>), so there is no fragmentation — but nothing stops one sequence taking most of the pages. That is the gap section 08 closes.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>Chunked prefill: long prompts can’t freeze the batch</h3>
+    <p>A 100k-token prompt prefilled in one pass stalls every decoding sequence on that replica for the length of the pass — hundreds of milliseconds of frozen streams for everyone else. Chunked prefill splits it into pieces of a few thousand tokens and interleaves them with decode steps, so the long request takes slightly longer and nobody else notices. The chunk size is a direct trade between one tenant’s time to first token and everyone else’s inter-token latency; it is set per pool.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s06"><span>Previous</span>06 — When a key leaks</a>
+        <a class="seq-next" href="#s08"><span>Next</span>08 — Three layers of isolation</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s08">
+  <details open>
+    <summary>
+      <div class="eyebrow">08 — Three layers of isolation</div>
+      <h2>Rate limits are necessary and nowhere near sufficient</h2>
+      <p class="q">How do you stop one tenant making the service slow for everyone else?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A tenant can stay within every request limit and still take over a replica, because requests are not the unit of cost. Isolation needs a layer at the door, a layer in the scheduler, and a layer in memory — each denominated in tokens.</p>
+
+  <div class="specs">
+    <div class="spec">
+      <div class="spec-id"><span class="pill edgep">layer 1 · gateway</span><h3>Limits at the door</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Limits</span><span class="v">Requests per minute, <b>input tokens per minute</b>, <b>output tokens per minute</b> (counted as the stream runs), concurrent streams — per tenant, per model, per tier.</span></div>
+        <div class="spec-item"><span class="k">Implementation</span><span class="v">Local token buckets. Each gateway holds a share of the tenant’s limit; a limit service rebalances the shares every second in proportion to each gateway’s recent traffic for that tenant.</span></div>
+        <div class="spec-item"><span class="k">Stops</span><span class="v">Floods, runaway retry loops, a leaked key being hammered.</span></div>
+        <div class="spec-item"><span class="k">Doesn’t stop</span><span class="v">A few enormous requests, or a burst that lands on one replica.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill gpup">layer 2 · scheduler</span><h3>A fair queue in the engine</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Idea</span><span class="v">Each tenant has a counter of service received, in weighted tokens. The next slot in the batch goes to the waiting tenant with the <b>lowest counter per unit of weight</b> — the Virtual Token Counter.</span></div>
+        <div class="spec-item"><span class="k">Why tokens</span><span class="v">Counting requests lets a tenant with 50k-token prompts take fifty times its share while looking fair.</span></div>
+        <div class="spec-item"><span class="k">Weights</span><span class="v">Tier and priority class: interactive over batch, paid tiers over free.</span></div>
+        <div class="spec-item"><span class="k">Stops</span><span class="v">One tenant’s queue starving everyone else’s at a busy replica.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="spec-id"><span class="pill gpup">layer 3 · memory</span><h3>KV caps and preemption</h3></div>
+      <div class="spec-grid">
+        <div class="spec-item"><span class="k">Cap</span><span class="v">While anyone else is waiting, a tenant may hold at most its fair share of KV blocks. When nobody is waiting it can use everything — <b>work-conserving</b>, so the cap costs nothing when idle.</span></div>
+        <div class="spec-item"><span class="k">Preemption</span><span class="v">When memory runs out, evict from the tenant furthest over its share, not from whoever arrived last. Short sequences are recomputed; long ones are swapped to host memory.</span></div>
+        <div class="spec-item"><span class="k">Stops</span><span class="v">The 128k-token request in <a href="#s07">07</a> taking the replica.</span></div>
+        <div class="spec-item"><span class="k">Oversized requests</span><span class="v">A request bigger than a fair share still runs — when the queue is clear, or on a larger replica shape. The catalog caps each pool’s context length at what its replicas can hold without starving everyone else.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <pre class="code"><span class="c"># per replica · runs each scheduler step, before the batch is formed</span>
+on request from tenant t, when t had nothing waiting:
+    counter[t] = max(counter[t], min(counter[u] for u in waiting))   <span class="c"># idle time can’t be banked</span>
+
+while batch has free slots and free KV blocks:
+    t = argmin(counter[u] / weight[u] for u in waiting)
+    r = next_request(t)
+    if others_waiting and kv_used[t] + blocks(r) &gt; fair_share(t):
+        skip t this step                                             <span class="c"># layer 3</span>
+    admit r
+
+after each step:
+    counter[t] += w_in × prefill_tokens[t] + w_out × decode_tokens[t]   <span class="c"># w_out &gt; w_in: decode holds memory longer</span></pre>
+
+  <div class="sub">
+    <h3>The prefix cache is a side channel</h3>
+    <p>Prefix caching keeps the KV blocks of a finished request so the next request with the same beginning skips its prefill. Across tenants that is a timing oracle: if my request for a guessed prompt comes back fast, someone else sent it recently. So every cache key is salted with the tenant — vLLM’s <code>cache_salt</code> exists for exactly this — and hits are only possible within one tenant. The cost is losing shared hits on common public system prompts, which is a small price for not leaking one customer’s prompts to another.</p>
+  </div>
+
+  <div class="note gpu"><b>Why all three:</b> layer 1 alone lets a tenant within limits take a replica with a few large requests. Layer 2 alone decides who goes next but not how much memory they hold once admitted. Layer 3 alone protects memory but does nothing about queue order. Each closes the hole the other two leave.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s07"><span>Previous</span>07 — Inside one replica</a>
+        <a class="seq-next" href="#s09"><span>Next</span>09 — Choosing a replica</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s09">
+  <details open>
+    <summary>
+      <div class="eyebrow">09 — Choosing a replica</div>
+      <h2>The least-loaded of two, unless the cache is warm</h2>
+      <p class="q">Which replica should this request go to?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Round-robin assumes every request costs the same, and least-connections assumes every connection does. Neither is true here. The router needs the engine’s own view of its load, and it needs to know where this tenant’s prefix is already cached.</p>
+
+  <figure>
+    <svg viewBox="0 0 960 300" role="img" aria-label="Prefix-affinity routing on a consistent-hash ring with bounded load. The request's salted prefix hash lands on the ring; the next replica clockwise is over the load bound, so the request spills to the following replica.">
+      <rect class="s-box" x="30" y="125" width="130" height="50" rx="10"/>
+      <text class="s-tb s-tm" x="95" y="148">request</text>
+      <text class="s-ts s-tm" x="95" y="164">tenant T</text>
+      <g class="edge">
+        <rect class="s-card" x="200" y="125" width="240" height="50" rx="10"/>
+        <line class="s-flow" x1="160" y1="150" x2="197" y2="150" marker-end="url(#ah-edge)"/>
+        <path class="s-flow" d="M440,150 C 560,150 620,70 698,61" marker-end="url(#ah-edge)"/>
+      </g>
+      <text class="s-t s-tm" x="320" y="148">hash(salt_T, first block)</text>
+      <text class="s-ts s-tm" x="320" y="164">lands on the ring</text>
+
+      <circle cx="650" cy="150" r="105" fill="none" stroke="var(--rule)" stroke-width="2"/>
+      <circle cx="702" cy="59" r="6" style="fill:var(--edge)"/>
+      <g class="gpu">
+        <circle class="s-node" cx="650" cy="45" r="16"/>
+        <circle class="s-node" cx="741" cy="202" r="16" style="fill:var(--gpu-wash)"/>
+        <circle class="s-node" cx="650" cy="255" r="16"/>
+        <circle class="s-node" cx="559" cy="202" r="16"/>
+        <circle class="s-node" cx="559" cy="98" r="16"/>
+      </g>
+      <g class="trust"><circle class="s-node" cx="741" cy="98" r="16" style="fill:var(--trust-wash)"/></g>
+      <path d="M715,68 A 105 105 0 0 1 736,86" fill="none" stroke="var(--edge)" stroke-width="2" marker-end="url(#ah-edge)"/>
+      <path d="M752,116 A 105 105 0 0 1 752,184" fill="none" stroke="var(--edge)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ah-edge)"/>
+      <text class="s-ts s-tm" x="650" y="49">r1</text>
+      <text class="s-ts s-tm" x="741" y="102">r2</text>
+      <text class="s-ts s-tm" x="741" y="206">r3</text>
+      <text class="s-ts s-tm" x="650" y="259">r4</text>
+      <text class="s-ts s-tm" x="559" y="206">r5</text>
+      <text class="s-ts s-tm" x="559" y="102">r6</text>
+
+      <text class="s-t" x="784" y="92" style="fill:var(--trust)">r2 · has the prefix</text>
+      <text class="s-ts" x="784" y="108">load 1.4 × average</text>
+      <text class="s-ts" x="784" y="124">over the 1.25 × bound → skip</text>
+      <text class="s-t" x="784" y="196" style="fill:var(--gpu)">r3 · chosen</text>
+      <text class="s-ts" x="784" y="212">next on the ring, under bound</text>
+      <text class="s-ts" x="784" y="228">its cache warms for next time</text>
+    </svg>
+    <figcaption>Consistent hashing with <b>bounded load</b>: go to the replica the prefix hashes to, unless it is carrying more than (1 + ε) times the average, in which case walk clockwise to the next one. Affinity when it’s cheap, spreading when it isn’t — and stable when replicas are added or removed.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>Stale metrics make herds</h3>
+    <p>Engines push queue depth, running sequences and KV use every 100 ms. Every gateway sees the same snapshot, so if a replica looks idle, <em>every</em> gateway sends it the next request, and 100 ms later it is the busiest in the pool. Two corrections: each gateway adds its <em>own</em> in-flight requests to the snapshot, which it knows exactly; and it picks the better of <em>two</em> random candidates rather than the best of all, which is almost as good and doesn’t herd.</p>
+  </div>
+  <pre class="code"><span class="c"># gateway · per request · all inputs already in memory</span>
+preferred = ring.lookup(hash(salt_T, first_block(prompt)), bound=1.25 × mean_load)
+a, b      = preferred, random_healthy_replica()
+score(r)  = queue[r] + inflight_from_me[r]          <span class="c"># snapshot + what I know I just sent</span>
+          + α × kv_used[r]                          <span class="c"># near-full KV means preemption soon</span>
+          − β × expected_prefix_hit(r, prompt)      <span class="c"># skipped prefill is latency and GPU saved</span>
+send to argmin(score(a), score(b))</pre>
+  <p class="body">This is the job the Kubernetes Gateway API Inference Extension calls an endpoint picker, and llm-d and Dynamo ship variants of it. The scoring weights are per pool: an 8B pool with short chats barely benefits from affinity, while a pool serving agent traffic with 20k-token shared system prompts can skip most of its prefill work with it.</p>
+      <nav class="seq">
+        <a class="seq-prev" href="#s08"><span>Previous</span>08 — Three layers of isolation</a>
+        <a class="seq-next" href="#s10"><span>Next</span>10 — What to scale on</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="4">
+  <div class="part-n">Part IV</div>
+  <div class="part-t">Capacity that follows demand</div>
+  <p class="part-d">A web tier scales in seconds on CPU. An inference pool scales in minutes, on signals that CPU knows nothing about, across ten models that all want the same scarce GPUs.</p>
+</div>
+
+<section id="s10">
+  <details open>
+    <summary>
+      <div class="eyebrow">10 — What to scale on</div>
+      <h2>Not CPU, and not requests per second</h2>
+      <p class="q">Which signal says a pool needs another replica?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">The metric an autoscaler targets should be the thing users feel, or something that moves before it. For a model pool that is time spent waiting in the engine’s queue, and how close the KV cache is to forcing preemptions.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Signal</th><th>Verdict</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">GPU utilisation</td><td><span class="pill trustp">misleading</span></td><td>Near 100% whenever anything at all is running. It can’t tell a comfortable replica from a drowning one.</td></tr>
+        <tr><td class="nm">requests per second</td><td><span class="pill trustp">misleading</span></td><td>A request can be 50 tokens or 100k. The same RPS can be idle or saturated depending on the mix.</td></tr>
+        <tr><td class="nm">queue wait p95</td><td><span class="pill gpup">primary</span></td><td>The part of time to first token that capacity controls (<a href="#s03">03</a>). Directly tied to the SLO.</td></tr>
+        <tr><td class="nm">KV cache use</td><td><span class="pill gpup">leading</span></td><td>Rises before queue wait does; above ~90% the engine starts preempting and latency jumps.</td></tr>
+        <tr><td class="nm">tokens/s vs benchmarked capacity</td><td><span class="pill ctlp">planning</span></td><td>Good for forecasting and for the floor; too slow-moving to react with.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <pre class="code"><span class="c"># per model pool · evaluated every 15 s by the capacity controller</span>
+pool: llama-3.3-70b
+replica_shape: { gpus: 2, type: H100-80G, tp: 2 }
+min_replicas: 2                     <span class="c"># one per zone, never zero (12)</span>
+max_replicas: 60
+scale_up:
+  when:  queue_wait_p95 &gt; 200ms  or  kv_used_p90 &gt; 0.85      <span class="c"># either one</span>
+  step:  max(1, ceil(0.2 × current))                          <span class="c"># proportional, not one at a time</span>
+  cooldown: 30s
+scale_down:
+  when:  queue_wait_p95 &lt; 50ms  and  kv_used_p90 &lt; 0.5  for 10m
+  step:  1
+  drain: stop routing, wait for streams (≤ 10m), then release
+floor:  forecast(same_hour_last_week) × growth × 0.8           <span class="c"># don’t wait to be surprised</span></pre>
+
+  <div class="sub">
+    <h3>Why up is fast and down is slow</h3>
+    <p>Adding a replica costs money for a few minutes. Removing one too early costs a cold start — minutes of degraded latency — the next time traffic rises (<a href="#s11">11</a>). The asymmetry follows directly: scale up on the first sign of trouble by a fraction of the pool, scale down one replica at a time after ten quiet minutes, and drain rather than kill so streams aren’t cut.</p>
+  </div>
+
+  <div class="sub">
+    <h3>When capacity can’t arrive in time</h3>
+    <p>Demand can outrun even a fast autoscaler. Rather than let queue wait grow for everyone, admission sheds load in order: batch-class traffic first, then free tier, then paid tiers above their committed rate. Shed requests get a <code>429</code> with a <code>Retry-After</code> computed from the pool’s current queue estimate, so well-behaved clients back off by the right amount instead of retrying into the storm.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s09"><span>Previous</span>09 — Choosing a replica</a>
+        <a class="seq-next" href="#s11"><span>Next</span>11 — Cold start</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s11">
+  <details open>
+    <summary>
+      <div class="eyebrow">11 — Cold start</div>
+      <h2>A replica takes minutes to exist</h2>
+      <p class="q">Why can’t inference scale like a web tier?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A stateless web pod starts in a second because it is small. A replica has to find a free GPU node, pull a multi-gigabyte image, move tens of gigabytes of weights into GPU memory, and warm up the engine. Almost all of autoscaling design is about skipping some of those steps.</p>
+
+  <figure>
+    <svg viewBox="0 0 960 250" role="img" aria-label="Three cold start timelines for a 70B replica. From a new node: about nine minutes. On a warm node with weights on local NVMe: about ninety seconds. Waking a sleeping replica: about ten seconds.">
+      <text class="s-ts" x="40" y="26">new node · nothing cached</text>
+      <rect x="40" y="36" width="440" height="34" style="fill:var(--sunk);stroke:var(--rule)"/>
+      <rect x="480" y="36" width="132" height="34" style="fill:var(--edge-wash)"/>
+      <rect x="612" y="36" width="117" height="34" style="fill:var(--gpu-wash)"/>
+      <rect x="729" y="36" width="88" height="34" style="fill:var(--ctl-wash)"/>
+      <text class="s-ts" x="52" y="58">provision a GPU node · ~5 min</text>
+      <text class="s-ts" x="490" y="58">image · 90 s</text>
+      <text class="s-ts" x="620" y="58">weights · 80 s</text>
+      <text class="s-ts" x="735" y="58">init · 60 s</text>
+      <text class="s-ts" x="826" y="58">≈ 9 min</text>
+
+      <text class="s-ts" x="40" y="100">warm node · image cached · weights on local NVMe</text>
+      <rect x="40" y="110" width="29" height="34" style="fill:var(--gpu-wash)"/>
+      <rect x="69" y="110" width="88" height="34" style="fill:var(--ctl-wash)"/>
+      <text class="s-ts" x="166" y="132">≈ 90 s · weights 20 s, then engine init and CUDA graph capture</text>
+
+      <text class="s-ts" x="40" y="174">sleeping replica · weights parked in host memory</text>
+      <rect x="40" y="184" width="15" height="34" style="fill:var(--gpu)"/>
+      <text class="s-ts" x="64" y="206">≈ 10 s · copy back to the GPU, resume</text>
+
+      <line x1="40" y1="232" x2="920" y2="232" stroke="var(--rule)" stroke-width="1.5"/>
+      <text class="s-ts s-tm" x="40" y="248">0</text>
+      <text class="s-ts s-tm" x="216" y="248">2 min</text>
+      <text class="s-ts s-tm" x="392" y="248">4 min</text>
+      <text class="s-ts s-tm" x="568" y="248">6 min</text>
+      <text class="s-ts s-tm" x="744" y="248">8 min</text>
+      <text class="s-ts s-tm" x="920" y="248">10 min</text>
+    </svg>
+    <figcaption>Typical orders of magnitude for Llama 3.3 70B in FP8 (~70 GB of weights) on 2 × H100. Node provisioning varies most by cloud; weight loading scales with size and storage bandwidth. The point is the ratios: <b>a warm pool is 6× faster than none, and a sleeping replica is 50× faster</b>.</figcaption>
+  </figure>
+
+  <div class="ladder">
+    <div class="rung"><span class="n">1</span><div><h3>Keep GPU nodes warm</h3><p>A small pool of provisioned, idle GPU nodes per node type, sized to cover one scale-up step for the largest pool. This removes the slowest and least predictable step. It is <b>the most expensive line item</b> in the design and also the one that makes autoscaling work at all.</p></div></div>
+    <div class="rung"><span class="n">2</span><div><h3>Pre-pull images, pre-stage weights</h3><p>Engine images are pulled to every GPU node ahead of time. Weights for every catalog model that fits are staged on local NVMe, and refreshed when the catalog changes. Loading then runs at disk speed rather than object-store speed.</p></div></div>
+    <div class="rung"><span class="n">3</span><div><h3>Sleep instead of scaling to zero</h3><p>vLLM’s sleep mode moves weights to host memory and frees the GPU, then restores them in seconds. A node can hold a quiet model asleep and a busy one awake, and swap them faster than a new replica could start.</p></div></div>
+    <div class="rung"><span class="n">4</span><div><h3>Scale on the forecast, not the alarm</h3><p>Traffic is strongly daily and weekly. A floor from last week’s same hour means the morning ramp is met by replicas that started ten minutes early, not by an alarm that fires at the peak.</p></div></div>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s10"><span>Previous</span>10 — What to scale on</a>
+        <a class="seq-next" href="#s12"><span>Next</span>12 — Ten models, one fleet</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="s12">
+  <details open>
+    <summary>
+      <div class="eyebrow">12 — Ten models, one fleet</div>
+      <h2>Ten pools that share one set of GPUs</h2>
+      <p class="q">How do ten models divide a fixed number of GPUs?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Each model is its own pool with its own autoscaler, but the GPUs underneath are one budget. Something above the pools has to decide which of them gets the next free node, and which gives one back.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>Model</th><th>Weights</th><th>Replica shape</th><th>Min replicas</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td class="nm">Llama 3.1 8B Instruct</td><td class="num">bf16 · 16 GB</td><td>1 × H100</td><td class="num">2</td></tr>
+        <tr><td class="num">2</td><td class="nm">Qwen2.5 7B Instruct</td><td class="num">bf16 · 15 GB</td><td>1 × H100</td><td class="num">2</td></tr>
+        <tr><td class="num">3</td><td class="nm">Mistral Small 24B</td><td class="num">FP8 · 24 GB</td><td>1 × H100</td><td class="num">2</td></tr>
+        <tr><td class="num">4</td><td class="nm">Gemma 2 27B</td><td class="num">FP8 · 27 GB</td><td>1 × H100</td><td class="num">1</td></tr>
+        <tr><td class="num">5</td><td class="nm">Qwen2.5 32B Instruct</td><td class="num">FP8 · 32 GB</td><td>1 × H100</td><td class="num">2</td></tr>
+        <tr><td class="num">6</td><td class="nm">Llama 3.3 70B Instruct</td><td class="num">FP8 · 70 GB</td><td>2 × H100 · TP=2</td><td class="num">2</td></tr>
+        <tr><td class="num">7</td><td class="nm">Qwen2.5 72B Instruct</td><td class="num">FP8 · 72 GB</td><td>2 × H100 · TP=2</td><td class="num">2</td></tr>
+        <tr><td class="num">8</td><td class="nm">DeepSeek-R1-Distill-Llama-70B</td><td class="num">FP8 · 70 GB</td><td>2 × H100 · TP=2</td><td class="num">1</td></tr>
+        <tr><td class="num">9</td><td class="nm">Mixtral 8×22B</td><td class="num">FP8 · 141 GB</td><td>4 × H100 · TP=4</td><td class="num">1</td></tr>
+        <tr><td class="num">10</td><td class="nm">DeepSeek-V3</td><td class="num">FP8 · ~690 GB</td><td>8 × H200 · TP=8</td><td class="num">2</td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td class="nm">the floor</td><td></td><td>23 × H100 + 16 × H200</td><td class="num">17</td></tr></tfoot>
+    </table>
+  </div>
+  <p class="body">An illustrative catalog, with FP8 weights wherever the model tolerates it. The floor row is what the service costs <em>before a single request</em> — about three H100 nodes and two H200 nodes, idle or not. It is the price of promising ten models with no cold start on the first request of the day.</p>
+
+  <div class="sub">
+    <h3>Packing, lending, and taking back</h3>
+    <p>An 8-GPU node can hold eight 1-GPU replicas, four TP=2 replicas, two TP=4 replicas, or one TP=8 — tensor-parallel groups must sit inside one node’s NVLink domain. A fleet arbiter above the pool autoscalers owns node assignment. Each pool has a guaranteed minimum and a ceiling. When a pool asks for more and no warm node is free, the arbiter reclaims from the pool with the lowest queue pressure that is above its minimum: stop routing to one of its replicas, let its streams drain, and hand the GPUs over. Draining is what makes lending safe — and it is also why reclaiming capacity is measured in minutes, not seconds.</p>
+  </div>
+
+  <div class="sub">
+    <h3>The long tail</h3>
+    <p>Quiet models are the expensive part of a catalog: two replicas of a model that sees ten requests a minute cost as much as two replicas that are full. Options, in order of preference: keep one awake replica and a second <em>asleep</em> on a node shared with a busier model (<a href="#s11">11</a>); consolidate quiet 1-GPU models onto fewer nodes; and, if a model stays quiet for a quarter, take it out of the catalog. Scale-to-zero is deliberately not on the list — a first request that waits minutes is not a service anyone would pay for.</p>
+  </div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s11"><span>Previous</span>11 — Cold start</a>
+        <a class="seq-next" href="#s13"><span>Next</span>13 — A region, sized</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<div class="part" data-part="5">
+  <div class="part-n">Part V</div>
+  <div class="part-t">A region, end to end</div>
+  <p class="part-d">Every part so far argued for a mechanism. This one puts numbers on all of them at once, for one region at a plausible peak — so the sizes can be checked against each other, and against your own benchmarks.</p>
+</div>
+
+<section id="s13">
+  <details open>
+    <summary>
+      <div class="eyebrow">13 — A region, sized</div>
+      <h2>Fifteen hundred requests a second, costed</h2>
+      <p class="q">What does the whole thing look like at a real number?</p>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">A single region across three availability zones, at a peak of 1,500 new requests a second, with an average prompt of 1,500 tokens, an average answer of 350, and an average stream lasting 12 seconds.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model class</th><th>Share</th><th>Req/s</th><th>Output tok/s</th><th>Per replica*</th><th>Replicas</th><th>GPUs</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">8B · 7B</td><td class="num">35%</td><td class="num">525</td><td class="num">184k</td><td class="num">8,000 · 1 GPU</td><td class="num">23</td><td class="num">23 H100</td></tr>
+        <tr><td class="nm">24B · 27B · 32B</td><td class="num">20%</td><td class="num">300</td><td class="num">105k</td><td class="num">4,000 · 1 GPU</td><td class="num">27</td><td class="num">27 H100</td></tr>
+        <tr><td class="nm">70B class · 3 models</td><td class="num">30%</td><td class="num">450</td><td class="num">158k</td><td class="num">3,500 · TP=2</td><td class="num">45</td><td class="num">90 H100</td></tr>
+        <tr><td class="nm">Mixtral 8×22B</td><td class="num">5%</td><td class="num">75</td><td class="num">26k</td><td class="num">4,000 · TP=4</td><td class="num">7</td><td class="num">28 H100</td></tr>
+        <tr><td class="nm">DeepSeek-V3</td><td class="num">10%</td><td class="num">150</td><td class="num">53k</td><td class="num">6,000 · TP=8</td><td class="num">9</td><td class="num">72 H200</td></tr>
+      </tbody>
+      <tfoot><tr><td class="nm">at peak</td><td class="num">100%</td><td class="num">1,500</td><td class="num">525k</td><td></td><td class="num">111</td><td class="num">168 H100 · 72 H200</td></tr></tfoot>
+    </table>
+  </div>
+  <p class="body">* Output tokens per second per replica at this prompt/answer mix while meeting the latency SLO — <em>an assumption to be replaced by your own benchmark</em>, not a vendor number. With 25% headroom for losing a zone and for scale-up lag, the fleet at peak is about <em>27 H100 nodes and 12 H200 nodes</em>; off-peak the autoscaler hands most of that back to the arbiter, down to the floor in <a href="#s12">12</a>.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Component</th><th>Size at peak</th><th>Load it carries</th><th>Scales on</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">gateway</td><td>12 pods × 4 vCPU, 4 per zone</td><td>18,000 concurrent streams (1,500 × 12 s); ≤ 2,500 each, so a zone can be lost</td><td>concurrent streams</td></tr>
+        <tr><td class="nm">key service</td><td>3 pods + Postgres</td><td>cache misses only — tens per second; revocations are rare</td><td>—</td></tr>
+        <tr><td class="nm">revocation bus</td><td>3 nodes</td><td>fan-out to 12 subscribers</td><td>—</td></tr>
+        <tr><td class="nm">limit service</td><td>3 nodes, 1 per zone</td><td>share rebalancing: roughly active tenants × gateways per second</td><td>active tenants</td></tr>
+        <tr><td class="nm">engines</td><td>111 replicas, 240 GPUs</td><td>2.25M input + 525k output tokens/s</td><td>queue wait · KV use</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><b>What the sizes say.</b> Everything except the engines is small — a few dozen CPU pods and one small database guarding roughly 240 GPUs. That ratio is the argument for the design’s shape: spend CPU freely at the edge to keep a GPU from doing a single token of work it shouldn’t, whether that token is unauthorised, abandoned, or crowding out another tenant.</div>
+      <nav class="seq">
+        <a class="seq-prev" href="#s12"><span>Previous</span>12 — Ten models, one fleet</a>
+        <a class="seq-next" href="#coda"><span>Next</span>Coda — Bound it, spend it locally</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="coda">
+  <details open>
+    <summary>
+      <div class="eyebrow">Coda</div>
+      <h2>Bound it, then spend it locally</h2>
+      <p class="q">Is there one idea underneath all of it?</p>
+    </summary>
+    <div class="sec-body">
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>&nbsp;</th><th>Rate</th><th>Key validity</th><th>GPU memory</th><th>Capacity</th></tr></thead>
+      <tbody>
+        <tr><td class="nm">authority</td><td>tenant’s limit</td><td>key service</td><td>replica’s KV pool</td><td>fleet arbiter</td></tr>
+        <tr><td class="nm">local budget</td><td>per-gateway bucket share</td><td>cached key entry</td><td>per-tenant block share</td><td>pool min / max</td></tr>
+        <tr><td class="nm">refreshed</td><td class="num">~1 s</td><td class="num">push · TTL 60 s</td><td class="num">every step</td><td class="num">15 s · drain in minutes</td></tr>
+        <tr><td class="nm">worst case</td><td>one bucket share per gateway</td><td>60 s on a partitioned gateway</td><td>one preemption</td><td>queue wait until a warm replica lands</td></tr>
+        <tr><td class="nm">section</td><td class="num"><a href="#s08">08</a></td><td class="num"><a href="#s05">05</a></td><td class="num"><a href="#s08">08</a></td><td class="num"><a href="#s10">10</a> <a href="#s12">12</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="lede">Every guarantee in this design has the same shape. A central authority holds the truth, hands out a <em>bounded</em> piece of it to whoever is on the hot path, and takes it back on a timer. The hot path never waits for the authority; the authority never lets the pieces add up to more than it can afford to lose.</p>
+  <p class="body">It is the same move four times — for rate, for trust, for memory and for capacity — and the design question each time is the same pair: <em>how big is the piece</em>, and <em>what is the worst it can cost</em> if the holder vanishes with it. Choose those two numbers deliberately and write them down, and a shared, public inference service stops being a set of competing concerns and becomes one mechanism applied carefully.</p>
+      <nav class="seq">
+        <a class="seq-prev" href="#s13"><span>Previous</span>13 — A region, sized</a>
+        <a class="seq-next" href="#glossary"><span>Next</span>Glossary</a>
+      </nav>
+    </div>
+  </details>
+</section>
+
+<section id="glossary">
+  <details open>
+    <summary>
+      <div class="eyebrow">Reference</div>
+      <h2>Glossary</h2>
+    </summary>
+    <div class="sec-body">
+      <p class="lede">Every term the guide leans on more than once. Each also appears as a dotted underline at its first use in a section — hover it there instead of coming here.</p>
+      <dl class="gloss">
+        <div><dt>bounded load</dt><dd>A consistent-hashing variant where a key goes to its usual node unless that node is over (1 + ε) × the average load, in which case it walks on to the next.</dd></div>
+        <div><dt>chunked prefill</dt><dd>Splitting a long prompt’s prefill into pieces interleaved with decode steps, so one long prompt doesn’t stall every other stream on the replica.</dd></div>
+        <div><dt>consistent hashing</dt><dd>Mapping keys and nodes onto a ring so that adding or removing a node only moves the keys next to it.</dd></div>
+        <div><dt>continuous batching</dt><dd>Scheduling per decode step rather than per request: sequences join and leave the running batch as they arrive and finish.</dd></div>
+        <div><dt>decode</dt><dd>Generating the answer one token per step. Bound by memory bandwidth; sets inter-token latency.</dd></div>
+        <div><dt>FP8</dt><dd>8-bit floating point. Halves weight memory relative to bf16 on GPUs that support it, usually at a small quality cost.</dd></div>
+        <div><dt>HMAC</dt><dd>A keyed hash. Stored for each API key as HMAC(pepper, secret), so a copy of the table can’t be checked without the pepper.</dd></div>
+        <div><dt>inter-token latency</dt><dd>The gap between successive streamed tokens. What streaming “feels like” after the first token arrives.</dd></div>
+        <div><dt>KV cache</dt><dd>The keys and values of every token so far, kept in GPU memory so each decode step doesn’t recompute them. The scarce resource on a shared replica.</dd></div>
+        <div><dt>Little’s law</dt><dd>Items in a system = arrival rate × time each spends in it. 1,500 streams a second × 12 s = 18,000 open.</dd></div>
+        <div><dt>mTLS</dt><dd>TLS where both sides present certificates. Here, how a replica knows it is talking to a gateway and nothing else.</dd></div>
+        <div><dt>negative cache</dt><dd>A short-lived record that a key ID does not exist, so forged IDs don’t reach the key service repeatedly.</dd></div>
+        <div><dt>PagedAttention</dt><dd>vLLM’s technique of storing the KV cache in fixed-size blocks, like virtual-memory pages, so it doesn’t fragment.</dd></div>
+        <div><dt>pepper</dt><dd>A secret key mixed into every stored hash and kept outside the database, in a KMS.</dd></div>
+        <div><dt>prefill</dt><dd>Processing the whole prompt in one parallel pass to fill the KV cache. Compute-bound; sets time to first token.</dd></div>
+        <div><dt>prefix cache</dt><dd>Keeping KV blocks after a request ends so a later request with the same beginning skips that part of its prefill.</dd></div>
+        <div><dt>single-flight</dt><dd>Collapsing concurrent identical lookups into one: the first caller fetches, the rest wait for its result.</dd></div>
+        <div><dt>SSE</dt><dd>Server-sent events. A long HTTP response of <code>data:</code> lines — the streaming format of chat completions.</dd></div>
+        <div><dt>time to first token</dt><dd>From the request arriving to the first streamed token: gateway, queue wait and prefill.</dd></div>
+        <div><dt>Virtual Token Counter</dt><dd>A fair scheduler that tracks tokens served per tenant and gives the next batch slot to the waiting tenant with the lowest count.</dd></div>
+        <div><dt>work-conserving</dt><dd>A limit that applies only when someone else is waiting, so an idle resource is never held back.</dd></div>
+      </dl>
+    </div>
+  </details>
+</section>
+
+<footer>
+  <p style="margin-bottom:16px">Throughput, cold-start and latency figures are illustrative orders of magnitude for H100/H200-class hardware and current open engines; replace them with your own measurements before sizing a real fleet. Model architecture figures are from the published model configurations.</p>
+  <div class="next">
+    <span>still to come · metering &amp; prepaid billing</span>
+    <span>speculative decoding</span>
+    <span>disaggregated prefill &amp; decode</span>
+    <span>LoRA multiplexing</span>
+    <span>multi-region failover</span>
+    <span>batch API &amp; offline queues</span>
+    <span>structured output &amp; tool calls</span>
+  </div>
+</footer>
+
+</div>
+<script>
+(function(){
+  var rail = document.querySelector('.rail');
+  if (!rail) return;
+  var secs = [].slice.call(document.querySelectorAll('section[id]'));
+  var links = {};
+  secs.forEach(function(sec){
+    var a = rail.querySelector('a[href="#' + sec.id + '"]');
+    if (a) links[sec.id] = a;
+  });
+  var PART_OF = {"s00": 0, "s01": 1, "s02": 1, "s03": 1, "s04": 2, "s05": 2, "s06": 2, "s07": 3, "s08": 3, "s09": 3, "s10": 4, "s11": 4, "s12": 4, "s13": 5, "coda": 6, "glossary": 6};
+  var activePart = -1, showAll = false;
+  var dividers = [].slice.call(document.querySelectorAll('.part[data-part]'));
+  var allBtn = document.getElementById('showAll');
+  function applyScope(){
+    secs.forEach(function(sec){
+      sec.style.display = (showAll || PART_OF[sec.id] === activePart) ? '' : 'none';
+    });
+    dividers.forEach(function(d){
+      d.style.display = (showAll || +d.getAttribute('data-part') === activePart) ? '' : 'none';
+    });
+  }
+  function setPart(p){
+    if (p === undefined || p === activePart) return;
+    activePart = p;
+    [].forEach.call(document.querySelectorAll('.rail-g'), function(g){
+      g.hidden = (+g.getAttribute('data-part') !== p);
+    });
+    [].forEach.call(document.querySelectorAll('.parts a, .utils a[data-part]'), function(t){
+      t.classList.toggle('on', +t.getAttribute('data-part') === p);
+    });
+    applyScope();
+  }
+  var active = null, ticking = false;
+  function spy(){
+    ticking = false;
+    var vis = secs.filter(function(x){ return x.offsetParent !== null; });
+    if (!vis.length) return;
+    var cur = vis[0];
+    for (var i = 0; i < vis.length; i++){
+      if (vis[i].getBoundingClientRect().top <= 140) cur = vis[i];
+    }
+    if (showAll) setPart(PART_OF[cur.id]);
+    var a = links[cur.id];
+    if (!a || a === active) return;
+    if (active) active.classList.remove('on');
+    a.classList.add('on');
+    active = a;
+    if (!rail.offsetHeight) return;
+    var r = rail.getBoundingClientRect(), t = a.getBoundingClientRect();
+    if (t.top < r.top + 8 || t.bottom > r.bottom - 8) rail.scrollTop += (t.top - r.top) - r.height / 2;
+  }
+  var dets = [].slice.call(document.querySelectorAll('section > details'));
+  var buttons = [].slice.call(document.querySelectorAll('.foldall'));
+  function setAll(open){
+    dets.forEach(function(d){ d.open = open; });
+    buttons.forEach(function(b){
+      b.textContent = open ? 'Collapse all' : 'Expand all';
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    spy();
+  }
+  buttons.forEach(function(b){
+    b.addEventListener('click', function(){
+      setAll(!dets.some(function(d){ return d.open; }));
+    });
+  });
+  function openTarget(hash){
+    if (!hash || hash.length < 2) return;
+    var id = hash.slice(1);
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (!showAll && PART_OF[id] !== undefined) setPart(PART_OF[id]);
+    var d = el.querySelector('details');
+    if (d) d.open = true;
+  }
+  document.addEventListener('click', function(e){
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (a) openTarget(a.getAttribute('href'));
+  });
+  addEventListener('hashchange', function(){ openTarget(location.hash); spy(); });
+  if (allBtn) allBtn.addEventListener('click', function(e){
+    e.preventDefault();
+    showAll = !showAll;
+    allBtn.classList.toggle('on', showAll);
+    allBtn.textContent = showAll ? 'One part at a time' : 'Show all';
+    applyScope();
+    spy();
+  });
+  addEventListener('beforeprint', function(){ setAll(true); showAll = true; applyScope(); });
+  setPart(location.hash.length > 1 && PART_OF[location.hash.slice(1)] !== undefined ? PART_OF[location.hash.slice(1)] : 0);
+  openTarget(location.hash);
+
+  function onScroll(){ if (!ticking){ ticking = true; requestAnimationFrame(spy); } }
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  spy();
+})();
+  var GLOSS = {
+    "bounded load": "A consistent-hashing variant: a key goes to its usual node unless that node is over (1 + ε) × the average load, then walks on to the next.",
+    "chunked prefill": "Splitting a long prompt's prefill into pieces interleaved with decode steps, so one long prompt doesn't stall every other stream.",
+    "consistent hashing": "Mapping keys and nodes onto a ring so that adding or removing a node only moves the keys next to it.",
+    "Continuous batching": "Scheduling per decode step rather than per request: sequences join and leave the running batch as they arrive and finish.",
+    "continuous batching": "Scheduling per decode step rather than per request: sequences join and leave the running batch as they arrive and finish.",
+    "HMAC": "A keyed hash. Stored for each API key as HMAC(pepper, secret), so a copy of the table can't be checked without the pepper.",
+    "inter-token latency": "The gap between successive streamed tokens — what streaming feels like after the first token.",
+    "KV cache": "The keys and values of every token so far, kept in GPU memory so each decode step doesn't recompute them.",
+    "Little’s law": "Items in a system = arrival rate × time each spends in it. 1,500 streams/s × 12 s = 18,000 open.",
+    "mTLS": "TLS where both sides present certificates — how a replica knows it is talking to a gateway.",
+    "negative cache": "A short-lived record that a key ID doesn't exist, so forged IDs don't reach the key service repeatedly.",
+    "PagedAttention": "Storing the KV cache in fixed-size blocks, like virtual-memory pages, so it doesn't fragment.",
+    "pepper": "A secret mixed into every stored hash and kept outside the database, in a KMS.",
+    "Prefix caching": "Keeping KV blocks after a request ends so a later request with the same beginning skips that part of its prefill.",
+    "single-flight": "Collapsing concurrent identical lookups into one: the first caller fetches, the rest wait for its result.",
+    "Server-sent events": "A long HTTP response of data: lines — the streaming format of chat completions.",
+    "time to first token": "From the request arriving to the first streamed token: gateway, queue wait and prefill.",
+    "Virtual Token Counter": "A fair scheduler that counts tokens served per tenant and gives the next batch slot to the waiting tenant with the lowest count.",
+    "work-conserving": "A limit that applies only when someone else is waiting, so an idle resource is never held back."
+  };
+  (function(){
+    var terms = Object.keys(GLOSS).sort(function(a,b){ return b.length - a.length; });
+    var SKIP = /^(CODE|PRE|A|SVG|FIGURE|TABLE|SUMMARY|H2|H3|DFN|BUTTON|NAV|SCRIPT)$/;
+    function skipped(node){
+      for (var q = node.parentNode; q && q !== document.body; q = q.parentNode){
+        if (SKIP.test(q.nodeName)) return true;
+        if (q.classList && (q.classList.contains('tablewrap') || q.classList.contains('hist'))) return true;
+        if (q.id === 'glossary') return true;
+      }
+      return false;
+    }
+    [].forEach.call(document.querySelectorAll('.sec-body'), function(body){
+      terms.forEach(function(term){
+        var re = new RegExp('(^|[^\\w-])' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
+        var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+        var node;
+        while ((node = walker.nextNode())){
+          if (skipped(node)) continue;
+          var m = re.exec(node.nodeValue);
+          if (!m) continue;
+          var tail = node.splitText(m.index + m[1].length);
+          tail.nodeValue = tail.nodeValue.slice(term.length);
+          var d = document.createElement('dfn');
+          d.className = 'g';
+          d.setAttribute('data-def', GLOSS[term]);
+          d.setAttribute('tabindex', '0');
+          d.textContent = term;
+          tail.parentNode.insertBefore(d, tail);
+          break;
+        }
+      });
+    });
+  })();
+</script>
+</body>
+</html>
