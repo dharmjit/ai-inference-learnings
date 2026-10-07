@@ -1,46 +1,42 @@
-# Keys, Queues and Caches
+# Weights, Caches and Guesses
 
-A design guide for a multi-tenant, regional LLM inference service — ten models, one
-shared fleet, `POST /v1/chat/completions` streamed over SSE to anyone holding an API key.
-It works inward from the request path, through the key that guards it, down to the KV
-cache on a single replica, and back out to the capacity that keeps the fleet sized.
+An inference guide that works from the transformer block down to the KV cache — model
+architecture, prefill and decode, how the KV cache is paged, compressed and offloaded, and
+the speculative tricks (draft models, Medusa, EAGLE, n-gram lookup) that turn one expensive
+read of the model into several tokens.
 
 **Read it → https://dharmjit.github.io/ai-inference-learnings/**
 
 One self-contained HTML file. No build step, no framework, no dependencies — the only
-script drives the contents rail, section folding and the glossary tooltips.
-Every diagram is hand-authored inline SVG. The only external request is to Google Fonts.
+script drives the contents rail, section folding, the glossary tooltips, the KV cache
+calculator in section 06 and the n-gram walk-through in section 16.
+Every diagram is inline SVG. The only external request is to Google Fonts.
 
 ## What's in it
 
-**Origins** — who built each piece of the serving stack, when, and what problem they actually had.
+**Origins** — who introduced each idea, when, and what problem they actually had.
 
-Organised by component, in the order a request meets them — one pill per component.
-
-| Component | Sections |
+| Part | Sections |
 | --- | --- |
-| **Overview** | 01 The shape of it · 02 The latency budget · 03 A region, sized — 1,500 req/s, 18,000 streams, ~240 GPUs |
-| **Gateway** | 04 The gateway holds on · 05 Inside the gateway — tables, stream lifecycle, backpressure, retries, catalog, metrics |
-| **Key service** | 06 Anatomy of a key · 07 Verifying every request · 08 When a key leaks |
-| **Limit service** | 09 One limit, many gateways — demand-weighted shares and their failure bounds |
-| **Router** | 10 Choosing a replica |
-| **Engine** | 11 Inside one replica · 12 Three layers of isolation · 13 The fair-queue scheduler — admission queue, cost model, parameters, tests |
-| **Autoscaler** | 14 What to scale on · 15 Cold start |
-| **Fleet arbiter** | 16 Ten models, one fleet |
-| **Coda** | Bound it, then spend it locally |
+| **I · The model** | 01 One block, many times · 02 Attention and its variants (MHA, MQA, GQA, MLA, RoPE) · 03 Mixture of experts |
+| **II · Prefill and decode** | 04 Two phases, two bottlenecks (roofline) · 05 Batching is the whole game |
+| **III · The KV cache** | 06 What the cache holds (calculator) · 07 Pages, not slabs · 08 Reusing a prefix |
+| **IV · Compressing the cache** | 09 Five ways to make it smaller · 10 Fewer bits · 11 Fewer tokens |
+| **V · Offloading the cache** | 12 Load or recompute · 13 A cache that outlives the GPU |
+| **VI · Speculative decoding** | 14 Guess, then check · 15 Where guesses come from · 16 N-grams: guessing for free (walk-through) |
+| **VII · Fitting it on GPUs** | 17 Fewer bits for weights · 18 Splitting a model |
+| **VIII · One model, end to end** | 19 One model, every lever — Llama 3.3 70B on H100s |
+| **Coda** | Read fewer bytes |
 
-The through-line: every guarantee is a central authority handing a *bounded* piece of
-itself to the hot path and taking it back on a timer. Rate limits become per-gateway
-bucket shares, key validity becomes a cached entry with a pushed revocation and a TTL,
-GPU memory becomes a per-tenant block share, capacity becomes a per-pool floor and ceiling.
-The design question each time is the same pair — how big is the piece, and what is the
-worst it can cost if the holder vanishes with it.
+The through-line: to write one token, a model reads every weight and every cached key and
+value of the conversation so far. Every technique here either reads fewer bytes per step,
+writes more tokens per read, or avoids the read by keeping something it already computed.
 
 ## Where to start
 
-The page opens with a table of the seven components and four reading paths — you're
-building the API, you run the GPUs, you own the platform, or the whole thing top to bottom. Every section also carries the
-question it answers, so a collapsed page reads as an index you can scan.
+The page opens with four reading paths — new to inference, you serve models, you choose
+models, or the whole thing top to bottom. Every section also carries the question it
+answers, so a collapsed page reads as an index you can scan.
 
 ## Reading it locally
 
@@ -63,21 +59,26 @@ If you fork it, update `og:url` and `link[rel=canonical]` in `index.html`, and t
 
 ## Still to come
 
-`metering & prepaid billing` · `speculative decoding` · `disaggregated prefill & decode` ·
-`LoRA multiplexing` · `multi-region failover` · `batch API & offline queues` ·
-`structured output & tool calls`
+`sampling & logits processing` · `structured output & constrained decoding` ·
+`LoRA adapters at serving time` · `long context: ring & sequence parallelism` ·
+`linear attention & state-space layers` · `attention kernels, inside`
 
 ## Corrections
 
 Inference moves fast, and this guide picks one answer where a real deployment might pick
 another. Conventions:
 
-- Model architecture figures (layers, KV heads, head dimension) are from the published model configs.
-- Throughput, cold-start and latency numbers are **illustrative orders of magnitude** for
-  H100/H200-class hardware and current open engines (vLLM, SGLang). Benchmark your own mix
-  before sizing a real fleet.
+- Model shapes (layers, heads, head dimension, expert counts) are from the published model configs.
+- Throughput, bandwidth and timing figures are **idealised order-of-magnitude estimates** for
+  H100-class hardware. They are there to reason about ratios — benchmark before you size anything.
+- Engine option names (vLLM, SGLang) change between releases; check the docs for your version.
 
 If something here is wrong, a PR or an issue naming the paper or the code is very welcome.
+
+## History
+
+An earlier version of this repo designed a multi-tenant inference *service* (gateway, keys,
+limits, fair-queue scheduler, autoscaling). It lives on the `service-design` branch.
 
 ## License
 
